@@ -12,7 +12,6 @@ interface GateDiagramProps {
   variableLabels?: Record<LogicVariable, string>;
 }
 
-const INPUT_COLORS = ["#2563eb", "#059669", "#dc2626", "#7c3aed"];
 const TERM_COLORS = [
   "#2563eb",
   "#059669",
@@ -24,6 +23,9 @@ const TERM_COLORS = [
   "#4f46e5"
 ];
 
+const MIN_WIDTH = 900;
+const LEGEND_COLUMNS = 3;
+
 export function GateDiagram({
   variableCount,
   terms,
@@ -32,48 +34,42 @@ export function GateDiagram({
   variableLabels
 }: GateDiagramProps) {
   const variables = getVariables(variableCount);
-  const width = 860;
-  const topPadding = 70;
-  const inputSpacing = 52;
-  const termSpacing = 92;
-  const height = Math.max(
-    300,
-    topPadding + variables.length * inputSpacing + 64,
-    76 + terms.length * termSpacing + 16
-  );
-  const inputY = new Map<LogicVariable, number>(
-    variables.map((variable, index) => [variable, topPadding + index * inputSpacing])
-  );
+  const title = formatDiagramTitle(expression, terms, variableLabels);
 
   if (terms.length === 0) {
     return (
-      <DiagramFrame height={220} width={width}>
-        <ConstantCircuit value="0" width={width} />
+      <DiagramFrame height={230} title={title} width={MIN_WIDTH}>
+        <ConstantCircuit value="0" width={MIN_WIDTH} />
       </DiagramFrame>
     );
   }
 
   if (expression === "1") {
     return (
-      <DiagramFrame height={220} width={width}>
-        <ConstantCircuit value="1" width={width} />
+      <DiagramFrame height={230} title={title} width={MIN_WIDTH}>
+        <ConstantCircuit value="1" width={MIN_WIDTH} />
       </DiagramFrame>
     );
   }
 
-  const termYs = terms.map((_, index) => 92 + index * termSpacing);
-  const orY = termYs.reduce((sum, y) => sum + y, 0) / termYs.length;
-  const hasOrGate = terms.length > 1;
-  const inputRailStartX = 76;
-  const branchStartX = 150;
-  const termBranchSpacing = 30;
-  const literalBranchSpacing = 9;
+  const legendRows = Math.max(1, Math.ceil(terms.length / LEGEND_COLUMNS));
+  const headerHeight = 84 + legendRows * 24;
+  const inputSpacing = 48;
+  const maxLiteralCount = Math.max(1, ...terms.map((term) => term.literals.length));
+  const termSpacing = Math.max(106, maxLiteralCount * 24 + 50);
+  const inputTop = headerHeight + 34;
+  const termTop = headerHeight + 28;
+  const inputRailStartX = 88;
+  const branchStartX = 154;
+  const termLaneSpacing = wireStyle === "straight" ? 28 : 36;
+  const literalLaneSpacing = wireStyle === "straight" ? 8 : 12;
   const literalBranchX = new Map<string, number>();
   let maxBranchX = branchStartX;
+
   terms.forEach((term, termIndex) => {
     term.literals.forEach((literal, literalIndex) => {
       const branchX =
-        branchStartX + termIndex * termBranchSpacing + literalIndex * literalBranchSpacing;
+        branchStartX + termIndex * termLaneSpacing + literalIndex * literalLaneSpacing;
       literalBranchX.set(
         literalRouteKey(term.id, literal.variable, literalIndex),
         branchX
@@ -81,22 +77,38 @@ export function GateDiagram({
       maxBranchX = Math.max(maxBranchX, branchX);
     });
   });
-  const inputBusEndX = Math.max(maxBranchX + 22, inputRailStartX + 140);
-  const gateX = Math.max(342, inputBusEndX + 88);
-  const collectorX = gateX + 186;
-  const orX = collectorX + 72;
-  const outputX = orX + 200;
-  const diagramWidth = Math.max(width, outputX + 70);
+
+  const inputBusEndX = Math.max(maxBranchX + 24, inputRailStartX + 170);
+  const gateX = inputBusEndX + 104;
+  const gateOutputX = gateX + 98;
+  const mergeX = gateOutputX + 48;
+  const hasOrGate = terms.length > 1;
+  const orX = hasOrGate ? mergeX + 92 : 0;
+  const orOutputX = hasOrGate ? orX + 126 : 0;
+  const outputX = hasOrGate ? orOutputX + 112 : mergeX + 160;
+  const diagramWidth = Math.max(MIN_WIDTH, outputX + 96);
+  const termYs = terms.map((_, index) => termTop + index * termSpacing);
+  const orY = termYs.reduce((sum, y) => sum + y, 0) / termYs.length;
+  const orPinYs = makePinYs(orY, terms.length, 28);
+  const inputY = new Map<LogicVariable, number>(
+    variables.map((variable, index) => [variable, inputTop + index * inputSpacing])
+  );
+  const height = Math.max(
+    340,
+    inputTop + variables.length * inputSpacing + 74,
+    termTop + terms.length * termSpacing + 64
+  );
 
   return (
-    <DiagramFrame height={height} width={diagramWidth}>
+    <DiagramFrame height={height} title={title} width={diagramWidth}>
+      <TermLegend terms={terms} variableLabels={variableLabels} />
+
       <g>
-        {variables.map((variable, index) => (
+        {variables.map((variable) => (
           <InputRail
             key={variable}
-            color={INPUT_COLORS[index % INPUT_COLORS.length]}
             label={variableLabels?.[variable] ?? variable}
-            y={inputY.get(variable) ?? topPadding}
+            y={inputY.get(variable) ?? inputTop}
             x1={inputRailStartX}
             x2={inputBusEndX}
           />
@@ -107,56 +119,53 @@ export function GateDiagram({
         {terms.map((term, termIndex) => {
           const termY = termYs[termIndex];
           const color = TERM_COLORS[termIndex % TERM_COLORS.length];
-          const literalYs = term.literals.map(
-            (_, literalIndex) =>
-              termY - ((term.literals.length - 1) * 18) / 2 + literalIndex * 18
-          );
-          const outputStartX = term.literals.length > 1 ? gateX + 86 : gateX + 36;
+          const pinYs = makePinYs(termY, term.literals.length, 24);
+          const gateHeight = Math.max(62, term.literals.length * 24 + 18);
+          const outputStartX =
+            term.literals.length > 1 ? gateOutputX : gateX + 36;
 
           return (
             <g key={term.id}>
               {term.literals.map((literal, literalIndex) => {
-                const sourceY = inputY.get(literal.variable) ?? topPadding;
-                const targetY = literalYs[literalIndex];
-                const notX = gateX - 72;
-                const inputEndX = literal.negated ? notX - 18 : gateX;
+                const sourceY = inputY.get(literal.variable) ?? inputTop;
+                const targetY = pinYs[literalIndex];
+                const notX = gateX - 52;
+                const inputEndX = literal.negated ? notX : gateX;
                 const branchX =
                   literalBranchX.get(
                     literalRouteKey(term.id, literal.variable, literalIndex)
                   ) ?? inputBusEndX;
-                const routeX =
-                  wireStyle === "straight" ? branchX : (branchX + inputEndX) / 2;
 
                 return (
-                  <g key={`${term.id}-${literal.variable}`}>
+                  <g key={`${term.id}-${literal.variable}-${literalIndex}`}>
                     <path
-                      d={makeWirePath({
+                      d={makeManhattanPath({
                         endX: inputEndX,
                         endY: targetY,
-                        routeX,
-                        startX: branchX,
-                        startY: sourceY,
-                        wireStyle
+                        routeX: branchX,
+                        startX: branchX - 14,
+                        startY: sourceY
                       })}
                       fill="none"
                       stroke={color}
                       strokeLinecap="round"
+                      strokeLinejoin="round"
                       strokeWidth="2.25"
-                      opacity="0.82"
+                      opacity="0.9"
                     />
-                    <circle cx={branchX} cy={sourceY} r="3.35" fill={color} />
+                    <circle cx={branchX} cy={sourceY} r="3.45" fill={color} />
                     {literal.negated && (
                       <>
                         <NotGate x={notX} y={targetY} color={color} />
                         <line
-                          x1={notX + 28}
+                          x1={notX + 31}
                           y1={targetY}
                           x2={gateX}
                           y2={targetY}
                           stroke={color}
                           strokeLinecap="round"
                           strokeWidth="2.25"
-                          opacity="0.82"
+                          opacity="0.9"
                         />
                       </>
                     )}
@@ -165,79 +174,80 @@ export function GateDiagram({
               })}
 
               {term.literals.length > 1 ? (
-                <AndGate color={color} x={gateX} y={termY} />
+                <AndGate
+                  color={color}
+                  fanIn={term.literals.length}
+                  height={gateHeight}
+                  x={gateX}
+                  y={termY}
+                />
               ) : (
                 <LiteralTap color={color} x={gateX} y={termY} />
               )}
 
-              <TermBadge
-                color={color}
-                label={formatTermLabel(term, variableLabels)}
-                x={gateX + 8}
-                y={termY + 34}
-              />
-
               {hasOrGate ? (
-                <>
-                  <line
-                    x1={outputStartX}
-                    y1={termY}
-                    x2={collectorX}
-                    y2={termY}
-                    stroke={color}
-                    strokeLinecap="round"
-                    strokeWidth="2.5"
-                  />
-                  <circle cx={collectorX} cy={termY} r="3.5" fill={color} />
-                </>
+                <path
+                  d={makeManhattanPath({
+                    endX: orX + 8,
+                    endY: orPinYs[termIndex],
+                    routeX: mergeX,
+                    startX: outputStartX,
+                    startY: termY
+                  })}
+                  fill="none"
+                  stroke={color}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2.55"
+                />
               ) : (
-                <>
-                  <path
-                    d={`M${outputStartX} ${termY} H${outputX}`}
-                    fill="none"
-                    stroke={color}
-                    strokeLinecap="round"
-                    strokeWidth="2.5"
-                  />
-                  <OutputPort x={outputX} y={termY} />
-                </>
+                <line
+                  x1={outputStartX}
+                  y1={termY}
+                  x2={outputX}
+                  y2={termY}
+                  stroke={color}
+                  strokeLinecap="round"
+                  strokeWidth="2.55"
+                />
               )}
+              <circle
+                cx={hasOrGate ? mergeX : outputStartX}
+                cy={termY}
+                r="3.6"
+                fill={color}
+              />
             </g>
           );
         })}
       </g>
 
-      {hasOrGate && (
+      {hasOrGate ? (
         <g>
           <line
-            x1={collectorX}
+            x1={mergeX}
             y1={Math.min(...termYs)}
-            x2={collectorX}
+            x2={mergeX}
             y2={Math.max(...termYs)}
             stroke="#94a3b8"
             strokeLinecap="round"
             strokeWidth="2"
-            opacity="0.7"
+            opacity="0.65"
           />
-          <path
-            d={`M${collectorX} ${orY} H${orX}`}
-            fill="none"
-            stroke="#475569"
-            strokeLinecap="round"
-            strokeWidth="2.5"
-          />
-          <OrGate x={orX} y={orY} />
+          <OrGate fanIn={terms.length} inputYs={orPinYs} x={orX} y={orY} />
           <line
-            x1={orX + 108}
+            x1={orOutputX}
             y1={orY}
             x2={outputX}
             y2={orY}
             stroke="#475569"
             strokeLinecap="round"
-            strokeWidth="2.5"
+            strokeWidth="2.55"
           />
-          <OutputPort x={outputX} y={orY} />
+          <OutputTerminal x={outputX} y={orY} />
         </g>
+      ) : (
+        <OutputTerminal x={outputX} y={termYs[0]} />
       )}
     </DiagramFrame>
   );
@@ -246,10 +256,11 @@ export function GateDiagram({
 interface DiagramFrameProps {
   width: number;
   height: number;
+  title: string;
   children: ReactNode;
 }
 
-function DiagramFrame({ width, height, children }: DiagramFrameProps) {
+function DiagramFrame({ width, height, title, children }: DiagramFrameProps) {
   return (
     <div className="overflow-x-auto rounded-md bg-slate-50">
       <svg
@@ -271,20 +282,59 @@ function DiagramFrame({ width, height, children }: DiagramFrameProps) {
         </defs>
         <rect width={width} height={height} rx="8" fill="#f8fafc" />
         <rect width={width} height={height} rx="8" fill="url(#circuitGrid)" opacity="0.62" />
+        <text x="34" y="36" className="fill-slate-900 text-lg font-bold">
+          {title}
+        </text>
         {children}
       </svg>
     </div>
   );
 }
 
+function TermLegend({
+  terms,
+  variableLabels
+}: {
+  terms: ProductTerm[];
+  variableLabels: Record<LogicVariable, string> | undefined;
+}) {
+  return (
+    <g>
+      {terms.map((term, index) => {
+        const col = index % LEGEND_COLUMNS;
+        const row = Math.floor(index / LEGEND_COLUMNS);
+        const x = 36 + col * 190;
+        const y = 62 + row * 24;
+        const color = TERM_COLORS[index % TERM_COLORS.length];
+
+        return (
+          <g key={term.id}>
+            <line
+              x1={x}
+              y1={y}
+              x2={x + 22}
+              y2={y}
+              stroke={color}
+              strokeLinecap="round"
+              strokeWidth="3"
+            />
+            <circle cx={x + 11} cy={y} r="3.2" fill={color} />
+            <text x={x + 32} y={y + 4} className="fill-slate-600 text-xs font-semibold">
+              {`term ${index + 1}: ${formatTermLabel(term, variableLabels)}`}
+            </text>
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
 function InputRail({
-  color,
   label,
   x1,
   x2,
   y
 }: {
-  color: string;
   label: string;
   x1: number;
   x2: number;
@@ -293,10 +343,10 @@ function InputRail({
   return (
     <g>
       <text
-        x="46"
-        y={y + 6}
+        x="64"
+        y={y + 5}
         textAnchor="end"
-        className="fill-slate-900 text-base font-bold"
+        className="fill-slate-900 text-sm font-bold"
       >
         {label}
       </text>
@@ -305,22 +355,24 @@ function InputRail({
         y1={y}
         x2={x2}
         y2={y}
-        stroke={color}
+        stroke="#64748b"
         strokeLinecap="round"
-        strokeWidth="2.6"
+        strokeWidth="2.2"
       />
+      <circle cx={x1} cy={y} r="3.1" fill="#ffffff" stroke="#64748b" strokeWidth="1.8" />
     </g>
   );
 }
 
 function ConstantCircuit({ value, width }: { value: "0" | "1"; width: number }) {
-  const y = 110;
+  const y = 122;
   const color = value === "1" ? "#059669" : "#64748b";
+  const outputX = width - 92;
 
   return (
     <g>
       <rect
-        x="34"
+        x="54"
         y={y - 20}
         width="46"
         height="40"
@@ -330,7 +382,7 @@ function ConstantCircuit({ value, width }: { value: "0" | "1"; width: number }) 
         strokeWidth="2"
       />
       <text
-        x="57"
+        x="77"
         y={y + 6}
         textAnchor="middle"
         className="fill-slate-800 text-lg font-bold"
@@ -338,65 +390,118 @@ function ConstantCircuit({ value, width }: { value: "0" | "1"; width: number }) 
         {value}
       </text>
       <line
-        x1="80"
+        x1="100"
         y1={y}
-        x2={width - 72}
+        x2={outputX}
         y2={y}
         stroke={color}
         strokeLinecap="round"
         strokeWidth="2.5"
       />
-      <OutputPort x={width - 72} y={y} />
+      <OutputTerminal x={outputX} y={y} />
     </g>
   );
 }
 
-function AndGate({ color, x, y }: { color: string; x: number; y: number }) {
+function AndGate({
+  color,
+  fanIn,
+  height,
+  x,
+  y
+}: {
+  color: string;
+  fanIn: number;
+  height: number;
+  x: number;
+  y: number;
+}) {
+  const halfHeight = height / 2;
+  const rightX = x + 96;
+  const flatRight = x + 42;
+
   return (
     <g filter="url(#gateShadow)">
       <path
-        d={`M${x} ${y - 29} H${x + 38} C${x + 82} ${y - 29}, ${x + 82} ${
-          y + 29
-        }, ${x + 38} ${y + 29} H${x} Z`}
+        d={`M${x} ${y - halfHeight} H${flatRight} C${rightX} ${
+          y - halfHeight
+        }, ${rightX} ${y + halfHeight}, ${flatRight} ${
+          y + halfHeight
+        } H${x} Z`}
         fill="#ffffff"
         stroke={color}
         strokeWidth="2.25"
       />
       <text
-        x={x + 37}
+        x={x + 43}
         y={y + 5}
         textAnchor="middle"
         className="fill-slate-700 text-[11px] font-bold"
       >
-        AND
+        {fanIn > 2 ? `AND${fanIn}` : "AND"}
       </text>
     </g>
   );
 }
 
-function OrGate({ x, y }: { x: number; y: number }) {
+function OrGate({
+  fanIn,
+  inputYs,
+  x,
+  y
+}: {
+  fanIn: number;
+  inputYs: number[];
+  x: number;
+  y: number;
+}) {
+  const label = fanIn === 3 ? "OR3" : `OR${fanIn}`;
+  const halfHeight = Math.max(46, ((fanIn - 1) * 28) / 2 + 22);
+
   return (
     <g filter="url(#gateShadow)">
+      {inputYs.map((inputY, index) => (
+        <line
+          key={`${inputY}-${index}`}
+          x1={x + 8}
+          y1={inputY}
+          x2={x + 24}
+          y2={inputY}
+          stroke="#475569"
+          strokeLinecap="round"
+          strokeWidth="2.25"
+        />
+      ))}
       <path
-        d={`M${x} ${y - 40} C${x + 38} ${y - 34}, ${x + 84} ${
-          y - 18
-        }, ${x + 108} ${y} C${x + 84} ${y + 18}, ${x + 38} ${
-          y + 34
-        }, ${x} ${y + 40} C${x + 20} ${y + 14}, ${x + 20} ${
-          y - 14
-        }, ${x} ${y - 40} Z`}
+        d={`M${x} ${y - halfHeight} C${x + 40} ${y - halfHeight + 8}, ${x + 96} ${
+          y - 20
+        }, ${x + 126} ${y} C${x + 96} ${y + 20}, ${x + 40} ${
+          y + halfHeight - 8
+        }, ${x} ${y + halfHeight} C${x + 22} ${y + 16}, ${x + 22} ${
+          y - 16
+        }, ${x} ${y - halfHeight} Z`}
         fill="#ffffff"
         stroke="#475569"
         strokeWidth="2.25"
       />
       <text
-        x={x + 56}
+        x={x + 65}
         y={y + 5}
         textAnchor="middle"
         className="fill-slate-700 text-[11px] font-bold"
       >
-        OR
+        {label}
       </text>
+      {fanIn !== 3 && (
+        <text
+          x={x + 65}
+          y={y + 22}
+          textAnchor="middle"
+          className="fill-slate-400 text-[9px] font-semibold"
+        >
+          fan-in {fanIn}
+        </text>
+      )}
     </g>
   );
 }
@@ -418,9 +523,18 @@ function NotGate({ color, x, y }: { color: string; x: number; y: number }) {
 function LiteralTap({ color, x, y }: { color: string; x: number; y: number }) {
   return (
     <g>
-      <circle cx={x + 18} cy={y} r="8.5" fill="#ffffff" stroke={color} strokeWidth="2.25" />
+      <rect
+        x={x + 4}
+        y={y - 10}
+        width="28"
+        height="20"
+        rx="5"
+        fill="#ffffff"
+        stroke={color}
+        strokeWidth="2"
+      />
       <line
-        x1={x + 26}
+        x1={x + 32}
         y1={y}
         x2={x + 36}
         y2={y}
@@ -432,69 +546,50 @@ function LiteralTap({ color, x, y }: { color: string; x: number; y: number }) {
   );
 }
 
-function TermBadge({
-  color,
-  label,
-  x,
-  y
-}: {
-  color: string;
-  label: string;
-  x: number;
-  y: number;
-}) {
-  const width = Math.max(44, label.length * 8 + 18);
-
+function OutputTerminal({ x, y }: { x: number; y: number }) {
   return (
-    <g>
-      <rect
-        x={x}
-        y={y}
-        width={width}
-        height="24"
-        rx="6"
-        fill="#ffffff"
-        stroke="#e2e8f0"
-      />
-      <circle cx={x + 12} cy={y + 12} r="3.5" fill={color} />
-      <text x={x + 22} y={y + 16} className="fill-slate-600 text-xs font-semibold">
-        {label}
-      </text>
-    </g>
+    <text x={x + 12} y={y + 5} className="fill-slate-800 text-sm font-bold">
+      F
+    </text>
   );
 }
 
-function OutputPort({ x, y }: { x: number; y: number }) {
-  return (
-    <g>
-      <circle cx={x} cy={y} r="5" fill="#ffffff" stroke="#475569" strokeWidth="2.25" />
-      <text x={x + 20} y={y + 5} className="fill-slate-800 text-sm font-bold">
-        F
-      </text>
-    </g>
+function makePinYs(centerY: number, count: number, spacing: number): number[] {
+  if (count <= 1) return [centerY];
+
+  return Array.from(
+    { length: count },
+    (_, index) => centerY - ((count - 1) * spacing) / 2 + index * spacing
   );
 }
 
-function makeWirePath({
+function makeManhattanPath({
   endX,
   endY,
   routeX,
   startX,
-  startY,
-  wireStyle
+  startY
 }: {
   endX: number;
   endY: number;
   routeX: number;
   startX: number;
   startY: number;
-  wireStyle: GateWireStyle;
 }) {
-  if (wireStyle === "straight") {
-    return `M${startX} ${startY} V${endY} H${endX}`;
-  }
+  return `M${startX} ${startY} H${routeX} V${endY} H${endX}`;
+}
 
-  return `M${startX} ${startY} C${routeX} ${startY}, ${routeX} ${endY}, ${endX} ${endY}`;
+function formatDiagramTitle(
+  expression: string,
+  terms: ProductTerm[],
+  labels: Record<LogicVariable, string> | undefined
+): string {
+  if (expression === "0" || expression === "1") return `F = ${expression}`;
+
+  const display = terms
+    .map((term) => formatTermLabel(term, labels))
+    .join(" + ");
+  return `F = ${display || expression}`;
 }
 
 function formatTermLabel(
