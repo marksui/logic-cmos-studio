@@ -8,7 +8,7 @@ import { UniversalGatesPanel } from "./components/UniversalGatesPanel";
 import { buildCmosPlan } from "./logic/cmos";
 import { evaluateFormula } from "./logic/formula";
 import { getVariables, makeTruthRows } from "./logic/kmap";
-import { PRESETS, type Preset } from "./logic/presets";
+import { PRESET_CATEGORIES, PRESETS, type Preset } from "./logic/presets";
 import { APP_VERSION } from "./version";
 import {
   nextOutputValue,
@@ -223,11 +223,24 @@ export default function App() {
   }
 
   function applyPreset(preset: Preset) {
-    setVariableCount(preset.variableCount);
-    setRawValues(preset.makeValues());
-    setFormulaInput(preset.formula);
-    setFormulaError("");
-    setPresetsOpen(false);
+    try {
+      const evaluation = evaluateFormula(
+        preset.formula,
+        preset.variableCount,
+        DEFAULT_INPUT_LABELS
+      );
+      setVariableCount(evaluation.variableCount);
+      setInputLabels(evaluation.variableLabels);
+      setRawValues(evaluation.values);
+      setFormulaInput(preset.formula);
+      setFormulaError("");
+      setPresetsOpen(false);
+    } catch (error) {
+      setFormulaInput(preset.formula);
+      setFormulaError(
+        error instanceof Error ? error.message : "Could not parse the preset."
+      );
+    }
   }
 
   function applyFormula() {
@@ -321,12 +334,12 @@ export default function App() {
             </div>
           </div>
           {presetsOpen && (
-            <div className="absolute right-4 top-12 z-20 max-h-[calc(100vh-120px)] w-[min(320px,calc(100vw-48px))] overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
+            <div className="absolute right-4 top-12 z-20 max-h-[calc(100vh-120px)] w-[min(520px,calc(100vw-48px))] overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
               <div>
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
                   Variables
                 </span>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-4 gap-2">
                   {VARIABLE_COUNTS.map((count) => (
                     <button
                       key={count}
@@ -406,25 +419,37 @@ export default function App() {
                 ))}
               </div>
               <div className="my-3 h-px bg-slate-100" />
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Presets
-              </span>
-              <div className="grid gap-2">
-                {PRESETS.map((preset) => (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => applyPreset(preset)}
-                    className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left transition hover:border-slate-300 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
-                  >
-                    <span className="block text-sm font-semibold text-slate-800">
-                      {preset.name}
-                    </span>
-                    <code className="mt-1 block text-xs text-slate-500">
-                      {preset.formula}
-                    </code>
-                  </button>
-                ))}
+              <div className="grid gap-3">
+                {PRESET_CATEGORIES.map((category) => {
+                  const presets = PRESETS.filter(
+                    (preset) => preset.category === category
+                  );
+
+                  return (
+                    <div key={category}>
+                      <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        {category}
+                      </span>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {presets.map((preset) => (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => applyPreset(preset)}
+                            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left transition hover:border-slate-300 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
+                          >
+                            <span className="block text-sm font-semibold text-slate-800">
+                              {preset.name}
+                            </span>
+                            <code className="mt-1 block break-words text-xs leading-5 text-slate-500">
+                              {preset.formula}
+                            </code>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               <div className="mt-3 grid grid-cols-4 gap-2">
                 <button
@@ -716,6 +741,16 @@ function FormulaGuideDialog({ onClose }: { onClose: () => void }) {
                   Use <code>buffer</code>, <code>and</code>, <code>or</code>,{" "}
                   <code>nand</code>, <code>nor</code>, <code>xor</code>, and{" "}
                   <code>xnor</code>.
+                </>
+              }
+            />
+            <GuideRow
+              label="Complex CMOS"
+              value={
+                <>
+                  Presets include <code>AOI21</code>, <code>AOI22</code>,{" "}
+                  <code>OAI21</code>, and <code>OAI22</code>; they auto-detect
+                  variables from the formula.
                 </>
               }
             />

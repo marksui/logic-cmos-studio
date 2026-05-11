@@ -8,6 +8,7 @@ const bundle = await build({
   stdin: {
     contents: `
       export { evaluateFormula } from "./src/logic/formula.ts";
+      export { PRESETS } from "./src/logic/presets.ts";
       export { simplifyPos, simplifySop } from "./src/logic/simplify.ts";
     `,
     loader: "ts",
@@ -21,7 +22,7 @@ const bundle = await build({
 
 const source = bundle.outputFiles[0].text;
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
-const { evaluateFormula, simplifyPos, simplifySop } = await import(moduleUrl);
+const { evaluateFormula, PRESETS, simplifyPos, simplifySop } = await import(moduleUrl);
 
 const DEFAULT_LABELS = {
   A: "A",
@@ -186,5 +187,24 @@ verifyFormula({
   formula: "((SA nand SB) xor (Cin nor D)) xnor (~SA + buffer D)",
   name: "complex mixed custom-name formula"
 });
+
+for (const preset of PRESETS) {
+  verifyFormula({
+    currentVariableCount: preset.variableCount,
+    expectedLabels: labelsForCount(preset.variableCount),
+    expectedValues: preset.makeValues(),
+    expectedVariableCount: preset.variableCount,
+    formula: preset.formula,
+    name: `preset ${preset.name}`
+  });
+}
+
+function labelsForCount(variableCount) {
+  return Object.fromEntries(
+    Object.keys(DEFAULT_LABELS)
+      .slice(0, variableCount)
+      .map((variable) => [variable, variable])
+  );
+}
 
 console.log("Formula verification passed: custom variables and complex gates match expected truth tables.");
