@@ -1,0 +1,101 @@
+import assert from "node:assert/strict";
+import { Buffer } from "node:buffer";
+import { build } from "esbuild";
+
+const bundle = await build({
+  bundle: true,
+  entryPoints: ["src/logic/formula.ts"],
+  format: "esm",
+  logLevel: "silent",
+  platform: "node",
+  write: false
+});
+
+const source = bundle.outputFiles[0].text;
+const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
+const { evaluateFormula } = await import(moduleUrl);
+
+const DEFAULT_LABELS = { A: "A", B: "B", C: "C", D: "D" };
+
+function bitsFor(minterm, variableCount) {
+  return Array.from({ length: variableCount }, (_, bitIndex) => {
+    const shift = variableCount - bitIndex - 1;
+    return (minterm >> shift) & 1;
+  });
+}
+
+function expectedValues(variableCount, evaluate) {
+  return Array.from({ length: 1 << variableCount }, (_, minterm) =>
+    evaluate(bitsFor(minterm, variableCount).map(Boolean)) ? "1" : "0"
+  );
+}
+
+function pickLabels(labels, variables) {
+  return Object.fromEntries(variables.map((variable) => [variable, labels[variable]]));
+}
+
+function verifyFormula({
+  currentVariableCount = 2,
+  expectedLabels,
+  expectedVariableCount,
+  expectedValues: values,
+  formula,
+  labels = DEFAULT_LABELS,
+  name
+}) {
+  const evaluation = evaluateFormula(formula, currentVariableCount, labels);
+
+  assert.equal(
+    evaluation.variableCount,
+    expectedVariableCount,
+    `${name}: variable count`
+  );
+  assert.deepEqual(
+    pickLabels(evaluation.variableLabels, Object.keys(expectedLabels)),
+    expectedLabels,
+    `${name}: variable labels`
+  );
+
+  if (values) {
+    assert.deepEqual(evaluation.values, values, `${name}: truth table`);
+  }
+}
+
+verifyFormula({
+  currentVariableCount: 3,
+  expectedLabels: { A: "SA", B: "SB" },
+  expectedValues: expectedValues(2, ([sa, sb]) => sa || sb),
+  expectedVariableCount: 2,
+  formula: "SA + SB",
+  name: "two-letter uppercase custom variables"
+});
+
+verifyFormula({
+  expectedLabels: { A: "SA", B: "SB" },
+  expectedValues: expectedValues(2, ([sa, sb]) => !(sa && sb)),
+  expectedVariableCount: 2,
+  formula: "SA nand SB",
+  name: "custom variables with gate words"
+});
+
+verifyFormula({
+  expectedLabels: { A: "A", B: "B", C: "C", D: "S" },
+  expectedVariableCount: 4,
+  formula: "AB xor AC nor BCA nand B and S",
+  name: "A-D implicit AND remains available"
+});
+
+verifyFormula({
+  currentVariableCount: 4,
+  expectedLabels: { A: "SA", B: "SB", C: "Cin", D: "D" },
+  expectedValues: expectedValues(4, ([sa, sb, cin, d]) => {
+    const left = !(sa && sb) !== !(cin || d);
+    const right = !sa || d;
+    return left === right;
+  }),
+  expectedVariableCount: 4,
+  formula: "((SA nand SB) xor (Cin nor D)) xnor (~SA + buffer D)",
+  name: "complex mixed custom-name formula"
+});
+
+console.log("Formula verification passed: custom variables and complex gates match expected truth tables.");

@@ -44,14 +44,14 @@ const RESERVED_WORDS = new Set([
 
 export function evaluateFormula(
   formula: string,
-  currentVariableCount: VariableCount,
+  _currentVariableCount: VariableCount,
   variableLabels: FormulaVariableLabels = {}
 ): FormulaEvaluation {
   const variableResolver = new VariableResolver(variableLabels);
   const tokens = addImplicitAnds(tokenize(formula, variableResolver));
   const parser = new FormulaParser(tokens);
   const ast = parser.parse();
-  const variableCount = pickVariableCount(ast, currentVariableCount);
+  const variableCount = pickVariableCount(ast);
   const values = Array.from({ length: 1 << variableCount }, (_, minterm) => {
     const bits = mintermToBits(minterm, variableCount);
     const context = new Map<LogicVariable, boolean>();
@@ -282,7 +282,7 @@ function tokenize(
         tokens.push({ type: "const", value: false });
       } else if (existingVariable) {
         tokens.push({ type: "var", value: existingVariable });
-      } else if (/^[A-Z]+$/.test(rawWord)) {
+      } else if (shouldSplitImplicitVariables(rawWord)) {
         for (const variableName of rawWord) {
           tokens.push({
             type: "var",
@@ -310,6 +310,10 @@ function tokenize(
   }
 
   return tokens;
+}
+
+function shouldSplitImplicitVariables(word: string): boolean {
+  return word.length > 1 && /^[A-D]+$/.test(word);
 }
 
 function addImplicitAnds(tokens: Token[]): Token[] {
@@ -521,11 +525,10 @@ class FormulaParser {
 }
 
 function pickVariableCount(
-  ast: FormulaNode,
-  currentVariableCount: VariableCount
+  ast: FormulaNode
 ): VariableCount {
   const requiredCount = Math.max(2, ...collectVariables(ast).map(variableRank));
-  return Math.max(requiredCount, currentVariableCount) as VariableCount;
+  return requiredCount as VariableCount;
 }
 
 function collectVariables(ast: FormulaNode): LogicVariable[] {

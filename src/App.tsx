@@ -48,7 +48,8 @@ const FORMULA_EXAMPLES = [
   "A xor B",
   "A xnor B",
   "A nand B",
-  "A nor B"
+  "A nor B",
+  "SA + SB"
 ];
 const DEFAULT_LOGIC_PANELS: PanelVisibility<LogicPanelId> = {
   diagram: true,
@@ -730,9 +731,9 @@ function FormulaGuideDialog({ onClose }: { onClose: () => void }) {
               label="Custom inputs"
               value={
                 <>
-                  Type names directly, for example <code>S xor A</code> or{" "}
-                  <code>Cin xor Sum</code>. New names map to the next free
-                  input, up to 4 total.
+                  Type names directly, for example <code>SA + SB</code>,{" "}
+                  <code>S xor A</code>, or <code>Cin xor Sum</code>. New names
+                  map to the next free input, up to 4 total.
                 </>
               }
             />
