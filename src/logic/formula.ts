@@ -20,6 +20,7 @@ type Token =
   | { type: "rparen" };
 
 interface FormulaEvaluation {
+  variableLabels: Record<LogicVariable, string>;
   variableCount: VariableCount;
   values: OutputValue[];
 }
@@ -46,9 +47,8 @@ export function evaluateFormula(
   currentVariableCount: VariableCount,
   variableLabels: FormulaVariableLabels = {}
 ): FormulaEvaluation {
-  const tokens = addImplicitAnds(
-    tokenize(formula, buildVariableAliasLookup(variableLabels))
-  );
+  const variableResolver = new VariableResolver(variableLabels);
+  const tokens = addImplicitAnds(tokenize(formula, variableResolver));
   const parser = new FormulaParser(tokens);
   const ast = parser.parse();
   const variableCount = pickVariableCount(ast, currentVariableCount);
@@ -65,40 +65,107 @@ export function evaluateFormula(
     return evaluateNode(ast, context) ? "1" : "0";
   });
 
-  return { variableCount, values };
-}
-
-function buildVariableAliasLookup(
-  variableLabels: FormulaVariableLabels
-): Map<string, LogicVariable> {
-  const aliases = new Map<string, LogicVariable>();
-
-  LOGIC_VARIABLES.forEach((variable) => aliases.set(variable, variable));
-
-  for (const variable of LOGIC_VARIABLES) {
-    const alias = normalizeVariableAlias(variableLabels[variable]);
-    if (!alias || RESERVED_WORDS.has(alias)) {
-      continue;
-    }
-
-    const existing = aliases.get(alias);
-    if (existing && existing !== variable) {
-      throw new Error("Variable names must be unique.");
-    }
-
-    aliases.set(alias, variable);
-  }
-
-  return aliases;
+  return {
+    variableCount,
+    variableLabels: variableResolver.getLabels(),
+    values
+  };
 }
 
 function normalizeVariableAlias(value: string | undefined): string {
   return (value ?? "").trim().replace(/\s+/g, "").toUpperCase();
 }
 
+class VariableResolver {
+  private readonly aliases = new Map<string, LogicVariable>();
+  private readonly dynamicAliases = new Map<string, LogicVariable>();
+  private readonly labels: Record<LogicVariable, string> = {
+    A: "A",
+    B: "B",
+    C: "C",
+    D: "D"
+  };
+  private readonly usedVariables = new Set<LogicVariable>();
+
+  constructor(variableLabels: FormulaVariableLabels) {
+    LOGIC_VARIABLES.forEach((variable) => this.aliases.set(variable, variable));
+
+    for (const variable of LOGIC_VARIABLES) {
+      const label = sanitizeAutoVariableLabel(variableLabels[variable]) || variable;
+      const alias = normalizeVariableAlias(label);
+      this.labels[variable] = label;
+
+      if (!alias || RESERVED_WORDS.has(alias)) {
+        continue;
+      }
+
+      const existing = this.aliases.get(alias);
+      if (existing && existing !== variable) {
+        throw new Error("Variable names must be unique.");
+      }
+
+      this.aliases.set(alias, variable);
+    }
+  }
+
+  getLabels(): Record<LogicVariable, string> {
+    return { ...this.labels };
+  }
+
+  resolveAlias(word: string): LogicVariable | null {
+    const alias = normalizeVariableAlias(word);
+    const variable = this.aliases.get(alias) ?? this.dynamicAliases.get(alias);
+
+    if (!variable) {
+      return null;
+    }
+
+    this.usedVariables.add(variable);
+    return variable;
+  }
+
+  resolveDynamic(word: string): LogicVariable {
+    const alias = normalizeVariableAlias(word);
+    const existing = this.dynamicAliases.get(alias);
+
+    if (existing) {
+      this.usedVariables.add(existing);
+      return existing;
+    }
+
+    const nextVariable = LOGIC_VARIABLES.find(
+      (variable) => !this.usedVariables.has(variable)
+    );
+
+    if (!nextVariable) {
+      throw new Error("This workspace supports up to 4 variables.");
+    }
+
+    const label = sanitizeAutoVariableLabel(word);
+    if (!label || RESERVED_WORDS.has(alias)) {
+      throw new Error(`"${word}" is reserved and cannot be used as a variable.`);
+    }
+
+    this.dynamicAliases.set(alias, nextVariable);
+    this.aliases.set(alias, nextVariable);
+    this.labels[nextVariable] = label;
+    this.usedVariables.add(nextVariable);
+    return nextVariable;
+  }
+}
+
+function sanitizeAutoVariableLabel(value: string | undefined): string {
+  return (value ?? "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/[^A-Za-z0-9_]/g, "")
+    .replace(/^[^A-Za-z_]+/, "")
+    .slice(0, 8);
+}
+
 function tokenize(
   input: string,
-  variableAliases: Map<string, LogicVariable>
+  variableResolver: VariableResolver
 ): Token[] {
   const tokens: Token[] = [];
   let index = 0;
@@ -185,11 +252,14 @@ function tokenize(
 
     if (/[A-Za-z]/.test(char)) {
       const start = index;
-      while (index < input.length && /[A-Za-z]/.test(input[index])) {
+      while (index < input.length && /[A-Za-z0-9_]/.test(input[index])) {
         index += 1;
       }
 
-      const word = input.slice(start, index).toUpperCase();
+      const rawWord = input.slice(start, index);
+      const word = rawWord.toUpperCase();
+      const existingVariable = variableResolver.resolveAlias(rawWord);
+
       if (word === "AND") {
         tokens.push({ type: "op", value: "and" });
       } else if (word === "NAND") {
@@ -210,22 +280,28 @@ function tokenize(
         tokens.push({ type: "const", value: true });
       } else if (word === "FALSE") {
         tokens.push({ type: "const", value: false });
-      } else if (variableAliases.has(word)) {
-        tokens.push({ type: "var", value: variableAliases.get(word)! });
-      } else if (/^[ABCD]+$/.test(word)) {
-        for (const variable of word) {
-          tokens.push({ type: "var", value: variable as LogicVariable });
+      } else if (existingVariable) {
+        tokens.push({ type: "var", value: existingVariable });
+      } else if (/^[A-Z]+$/.test(rawWord)) {
+        for (const variableName of rawWord) {
+          tokens.push({
+            type: "var",
+            value:
+              variableResolver.resolveAlias(variableName) ??
+              variableResolver.resolveDynamic(variableName)
+          });
         }
       } else {
-        throw new Error(
-          "Use your variable names or A, B, C, D with operators AND, OR, NOT, BUFFER, NAND, NOR, XOR, XNOR."
-        );
+        tokens.push({
+          type: "var",
+          value: variableResolver.resolveDynamic(rawWord)
+        });
       }
       continue;
     }
 
     throw new Error(
-      `Unexpected character "${char}". Use A-D plus words like buffer, nand, nor, xor, xnor, or the symbols shown in Guide.`
+      `Unexpected character "${char}". Use up to 4 variable names plus words like buffer, nand, nor, xor, xnor, or the symbols shown in Guide.`
     );
   }
 

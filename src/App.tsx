@@ -237,6 +237,7 @@ export default function App() {
     try {
       const evaluation = evaluateFormula(formulaInput, variableCount, displayLabels);
       setVariableCount(evaluation.variableCount);
+      setInputLabels(evaluation.variableLabels);
       setRawValues(evaluation.values);
       setFormulaError("");
       setPresetsOpen(false);
@@ -413,7 +414,7 @@ export default function App() {
                   ))}
                 </div>
                 <p className="mt-2 text-xs leading-5 text-slate-400">
-                  Use these names in formulas. A, B, C, and D still work too.
+                  Use these names or type new ones in formulas. A-D still work too.
                 </p>
               </div>
               <div className="my-3 h-px bg-slate-100" />
@@ -506,6 +507,9 @@ export default function App() {
             <p className="text-xs font-medium text-slate-500">
               Use variables:{" "}
               <code className="text-slate-700">{activeDisplayLabels.join(", ")}</code>
+              <span className="ml-1 text-slate-400">
+                or new names, up to 4 inputs
+              </span>
             </p>
             {formulaError && (
               <p
@@ -760,8 +764,9 @@ function FormulaGuideDialog({ onClose }: { onClose: () => void }) {
               label="Custom inputs"
               value={
                 <>
-                  Renamed inputs work in formulas, for example{" "}
-                  <code>A xor B xor Cin</code>. A, B, C, and D remain aliases.
+                  Type names directly, for example <code>S xor A</code> or{" "}
+                  <code>Cin xor Sum</code>. New names map to the next free
+                  input, up to 4 total.
                 </>
               }
             />
