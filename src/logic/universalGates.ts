@@ -180,7 +180,7 @@ function universalToVerilog(ast: UniversalGateAst): string {
 }
 
 function wrapVerilog(expression: string): string {
-  return /^[A-D]$/.test(expression) ? expression : `(${expression})`;
+  return /^[A-H]$/.test(expression) ? expression : `(${expression})`;
 }
 
 function countPrimitives(ast: UniversalGateAst): Record<UniversalGateKind, number> {

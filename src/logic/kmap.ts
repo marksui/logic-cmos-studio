@@ -7,11 +7,6 @@ import {
   type VariableCount
 } from "./types";
 
-const GRAY_CODES: Record<number, string[]> = {
-  1: ["0", "1"],
-  2: ["00", "01", "11", "10"]
-};
-
 export function getVariables(variableCount: VariableCount): LogicVariable[] {
   return ALL_VARIABLES.slice(0, variableCount);
 }
@@ -40,7 +35,7 @@ export function makeTruthRows(
 }
 
 function splitVariables(variableCount: VariableCount) {
-  const rowBitCount = variableCount === 4 ? 2 : 1;
+  const rowBitCount = Math.floor(variableCount / 2);
   const colBitCount = variableCount - rowBitCount;
   const variables = getVariables(variableCount);
 
@@ -58,8 +53,8 @@ export function buildKMap(
 ): KMapData {
   const { rowBitCount, colBitCount, rowVariables, colVariables } =
     splitVariables(variableCount);
-  const rowLabels = GRAY_CODES[rowBitCount];
-  const colLabels = GRAY_CODES[colBitCount];
+  const rowLabels = makeGrayCodes(rowBitCount);
+  const colLabels = makeGrayCodes(colBitCount);
 
   const cells = rowLabels.map((rowCode, row) =>
     colLabels.map((colCode, col) => {
@@ -85,4 +80,10 @@ export function buildKMap(
     colLabels,
     cells
   };
+}
+
+function makeGrayCodes(bitCount: number): string[] {
+  return Array.from({ length: 1 << bitCount }, (_, index) =>
+    (index ^ (index >> 1)).toString(2).padStart(bitCount, "0")
+  );
 }

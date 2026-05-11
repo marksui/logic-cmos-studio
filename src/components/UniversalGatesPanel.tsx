@@ -93,7 +93,7 @@ function replaceBooleanVariables(
   expression: string,
   labels: Record<LogicVariable, string>
 ): string {
-  return expression.replace(/[A-D]/g, (variable) => {
+  return expression.replace(/[A-H]/g, (variable) => {
     const logicVariable = variable as LogicVariable;
     return labels[logicVariable] ?? variable;
   });
@@ -103,7 +103,7 @@ function replaceStandaloneVariables(
   expression: string,
   labels: Record<LogicVariable, string>
 ): string {
-  return expression.replace(/\b[A-D]\b/g, (variable) => {
+  return expression.replace(/\b[A-H]\b/g, (variable) => {
     const logicVariable = variable as LogicVariable;
     return labels[logicVariable] ?? variable;
   });

@@ -1,4 +1,5 @@
 import { mintermToBits } from "./kmap";
+import { ALL_VARIABLES, MAX_VARIABLE_COUNT, MIN_VARIABLE_COUNT } from "./types";
 import type { LogicVariable, OutputValue, VariableCount } from "./types";
 
 type FormulaNode =
@@ -25,7 +26,7 @@ interface FormulaEvaluation {
   values: OutputValue[];
 }
 
-const LOGIC_VARIABLES: LogicVariable[] = ["A", "B", "C", "D"];
+const LOGIC_VARIABLES: readonly LogicVariable[] = ALL_VARIABLES;
 const RESERVED_WORDS = new Set([
   "AND",
   "BUF",
@@ -56,7 +57,7 @@ export function evaluateFormula(
     const bits = mintermToBits(minterm, variableCount);
     const context = new Map<LogicVariable, boolean>();
 
-    (["A", "B", "C", "D"] as LogicVariable[])
+    LOGIC_VARIABLES
       .slice(0, variableCount)
       .forEach((variable, index) => {
         context.set(variable, bits[index] === 1);
@@ -79,12 +80,9 @@ function normalizeVariableAlias(value: string | undefined): string {
 class VariableResolver {
   private readonly aliases = new Map<string, LogicVariable>();
   private readonly dynamicAliases = new Map<string, LogicVariable>();
-  private readonly labels: Record<LogicVariable, string> = {
-    A: "A",
-    B: "B",
-    C: "C",
-    D: "D"
-  };
+  private readonly labels: Record<LogicVariable, string> = Object.fromEntries(
+    LOGIC_VARIABLES.map((variable) => [variable, variable])
+  ) as Record<LogicVariable, string>;
   private readonly usedVariables = new Set<LogicVariable>();
 
   constructor(variableLabels: FormulaVariableLabels) {
@@ -138,7 +136,7 @@ class VariableResolver {
     );
 
     if (!nextVariable) {
-      throw new Error("This workspace supports up to 4 variables.");
+      throw new Error(`This workspace supports up to ${MAX_VARIABLE_COUNT} variables.`);
     }
 
     const label = sanitizeAutoVariableLabel(word);
@@ -301,7 +299,7 @@ function tokenize(
     }
 
     throw new Error(
-      `Unexpected character "${char}". Use up to 4 variable names plus words like buffer, nand, nor, xor, xnor, or the symbols shown in Guide.`
+      `Unexpected character "${char}". Use up to ${MAX_VARIABLE_COUNT} variable names plus words like buffer, nand, nor, xor, xnor, or the symbols shown in Guide.`
     );
   }
 
@@ -313,7 +311,10 @@ function tokenize(
 }
 
 function shouldSplitImplicitVariables(word: string): boolean {
-  return word.length > 1 && /^[A-D]+$/.test(word);
+  return (
+    word.length > 1 &&
+    [...word].every((char) => LOGIC_VARIABLES.includes(char as LogicVariable))
+  );
 }
 
 function addImplicitAnds(tokens: Token[]): Token[] {
@@ -527,7 +528,10 @@ class FormulaParser {
 function pickVariableCount(
   ast: FormulaNode
 ): VariableCount {
-  const requiredCount = Math.max(2, ...collectVariables(ast).map(variableRank));
+  const requiredCount = Math.max(
+    MIN_VARIABLE_COUNT,
+    ...collectVariables(ast).map(variableRank)
+  );
   return requiredCount as VariableCount;
 }
 
@@ -540,7 +544,7 @@ function collectVariables(ast: FormulaNode): LogicVariable[] {
 }
 
 function variableRank(variable: LogicVariable): number {
-  return ["A", "B", "C", "D"].indexOf(variable) + 1;
+  return LOGIC_VARIABLES.indexOf(variable) + 1;
 }
 
 function evaluateNode(

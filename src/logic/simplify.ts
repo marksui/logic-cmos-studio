@@ -20,8 +20,6 @@ interface CandidateGroup {
   literalCount: number;
 }
 
-const POWERS_OF_TWO = [1, 2, 4];
-
 export function normalizeValues(
   variableCount: VariableCount,
   values: OutputValue[] = []
@@ -128,8 +126,8 @@ function findPrimeGroups(
 ): CandidateGroup[] {
   const kmap = buildKMap(variableCount, values);
   const candidatesByCells = new Map<string, CandidateGroup>();
-  const rowSizes = POWERS_OF_TWO.filter((size) => size <= kmap.rows);
-  const colSizes = POWERS_OF_TWO.filter((size) => size <= kmap.cols);
+  const rowSizes = powersOfTwoUpTo(kmap.rows);
+  const colSizes = powersOfTwoUpTo(kmap.cols);
   const blockingValue = targetValue === "1" ? "0" : "1";
 
   // K-map simplification is based on rectangular power-of-two groups. The
@@ -163,9 +161,13 @@ function findPrimeGroups(
             continue;
           }
 
+          const literals = deriveLiterals(variableCount, cells);
+          if (!isCompleteCube(variableCount, allCells, literals)) {
+            continue;
+          }
+
           const key = setKey(allCells);
           if (!candidatesByCells.has(key)) {
-            const literals = deriveLiterals(variableCount, cells);
             candidatesByCells.set(key, {
               id: key,
               literals,
@@ -382,4 +384,20 @@ function setKey(values: Set<number>): string {
 
 function isSubset<T>(subset: Set<T>, superset: Set<T>): boolean {
   return [...subset].every((value) => superset.has(value));
+}
+
+function isCompleteCube(
+  variableCount: VariableCount,
+  cells: Set<number>,
+  literals: ProductLiteral[]
+): boolean {
+  return cells.size === 1 << (variableCount - literals.length);
+}
+
+function powersOfTwoUpTo(limit: number): number[] {
+  const values: number[] = [];
+  for (let value = 1; value <= limit; value *= 2) {
+    values.push(value);
+  }
+  return values;
 }

@@ -17,6 +17,7 @@ import {
   simplifySop
 } from "./logic/simplify";
 import { buildUniversalGateConversions } from "./logic/universalGates";
+import { ALL_VARIABLES, MAX_VARIABLE_COUNT, MIN_VARIABLE_COUNT } from "./logic/types";
 import type {
   LogicVariable,
   OutputValue,
@@ -26,7 +27,10 @@ import type {
   VariableCount
 } from "./logic/types";
 
-const VARIABLE_COUNTS: VariableCount[] = [2, 3, 4];
+const VARIABLE_COUNTS: VariableCount[] = Array.from(
+  { length: MAX_VARIABLE_COUNT - MIN_VARIABLE_COUNT + 1 },
+  (_, index) => MIN_VARIABLE_COUNT + index
+);
 const DEFAULT_PRESET = PRESETS.find((preset) => preset.id === "majority")!;
 type Workspace = "logic" | "cmos" | "review";
 type CopyState = "idle" | "copied" | "failed";
@@ -82,12 +86,9 @@ const CMOS_PANEL_OPTIONS: { id: CmosPanelId; label: string }[] = [
   { id: "netlist", label: "Netlist" }
 ];
 
-const DEFAULT_INPUT_LABELS: Record<LogicVariable, string> = {
-  A: "A",
-  B: "B",
-  C: "C",
-  D: "D"
-};
+const DEFAULT_INPUT_LABELS = Object.fromEntries(
+  ALL_VARIABLES.map((variable) => [variable, variable])
+) as Record<LogicVariable, string>;
 
 export default function App() {
   const [variableCount, setVariableCount] = useState<VariableCount>(
@@ -320,7 +321,7 @@ export default function App() {
             </div>
           </div>
           {presetsOpen && (
-            <div className="absolute right-4 top-12 z-20 w-[min(320px,calc(100vw-48px))] rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
+            <div className="absolute right-4 top-12 z-20 max-h-[calc(100vh-120px)] w-[min(320px,calc(100vw-48px))] overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
               <div>
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
                   Variables
@@ -381,7 +382,7 @@ export default function App() {
                   ))}
                 </div>
                 <p className="mt-2 text-xs leading-5 text-slate-400">
-                  Use these names or type new ones in formulas. A-D still work too.
+                  Use these names or type new ones in formulas. A-H still work too.
                 </p>
               </div>
               <div className="my-3 h-px bg-slate-100" />
@@ -475,7 +476,7 @@ export default function App() {
               Use variables:{" "}
               <code className="text-slate-700">{activeDisplayLabels.join(", ")}</code>
               <span className="ml-1 text-slate-400">
-                or new names, up to 4 inputs
+                or new names, up to {MAX_VARIABLE_COUNT} inputs
               </span>
             </p>
             {formulaError && (
@@ -733,7 +734,7 @@ function FormulaGuideDialog({ onClose }: { onClose: () => void }) {
                 <>
                   Type names directly, for example <code>SA + SB</code>,{" "}
                   <code>S xor A</code>, or <code>Cin xor Sum</code>. New names
-                  map to the next free input, up to 4 total.
+                  map to the next free input, up to {MAX_VARIABLE_COUNT} total.
                 </>
               }
             />
@@ -1007,7 +1008,7 @@ function replaceVerilogVariables(
   expression: string,
   labels: Record<LogicVariable, string>
 ): string {
-  return expression.replace(/\b[A-D]\b/g, (variable) => {
+  return expression.replace(/\b[A-H]\b/g, (variable) => {
     const logicVariable = variable as LogicVariable;
     return labels[logicVariable] ?? variable;
   });
@@ -1016,10 +1017,10 @@ function replaceVerilogVariables(
 function normalizeInputLabels(
   labels: Record<LogicVariable, string>
 ): Record<LogicVariable, string> {
-  return {
-    A: sanitizeVariableLabel(labels.A) || "A",
-    B: sanitizeVariableLabel(labels.B) || "B",
-    C: sanitizeVariableLabel(labels.C) || "C",
-    D: sanitizeVariableLabel(labels.D) || "D"
-  };
+  return Object.fromEntries(
+    ALL_VARIABLES.map((variable) => [
+      variable,
+      sanitizeVariableLabel(labels[variable]) || variable
+    ])
+  ) as Record<LogicVariable, string>;
 }

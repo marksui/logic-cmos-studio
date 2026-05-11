@@ -1,7 +1,9 @@
-export type VariableCount = 2 | 3 | 4;
+export type VariableCount = number;
 export type OutputValue = "0" | "1" | "X";
 
-export const ALL_VARIABLES = ["A", "B", "C", "D"] as const;
+export const ALL_VARIABLES = ["A", "B", "C", "D", "E", "F", "G", "H"] as const;
+export const MIN_VARIABLE_COUNT = 2;
+export const MAX_VARIABLE_COUNT = ALL_VARIABLES.length;
 export type LogicVariable = (typeof ALL_VARIABLES)[number];
 
 export interface TruthRow {
