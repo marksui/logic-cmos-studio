@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { CMOSPanel } from "./components/CMOSPanel";
 import { GateDiagram, type GateWireStyle } from "./components/GateDiagram";
 import { KMapPanel } from "./components/KMapPanel";
@@ -91,6 +91,7 @@ export default function App() {
   const [formulaInput, setFormulaInput] = useState(DEFAULT_PRESET.formula);
   const [formulaError, setFormulaError] = useState("");
   const [presetsOpen, setPresetsOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const [displayOpen, setDisplayOpen] = useState(false);
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace>("logic");
   const [logicPanels, setLogicPanels] =
@@ -306,14 +307,26 @@ export default function App() {
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
               Formula
             </h2>
-            <button
-              type="button"
-              onClick={() => setPresetsOpen((open) => !open)}
-              className="control-button py-1.5 text-xs"
-              aria-expanded={presetsOpen}
-            >
-              Presets
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setGuideOpen(true);
+                  setPresetsOpen(false);
+                }}
+                className="control-button py-1.5 text-xs"
+              >
+                Guide
+              </button>
+              <button
+                type="button"
+                onClick={() => setPresetsOpen((open) => !open)}
+                className="control-button py-1.5 text-xs"
+                aria-expanded={presetsOpen}
+              >
+                Presets
+              </button>
+            </div>
           </div>
           {presetsOpen && (
             <div className="absolute right-4 top-12 z-20 w-[min(320px,calc(100vw-48px))] rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
@@ -481,6 +494,8 @@ export default function App() {
             )}
           </form>
         </section>
+
+        {guideOpen && <FormulaGuideDialog onClose={() => setGuideOpen(false)} />}
 
         <WorkspaceTabs
           activeWorkspace={activeWorkspace}
@@ -663,6 +678,112 @@ function EmptyView({ workspace }: { workspace: Workspace | "Logic" | "CMOS" }) {
         Open Display to choose what appears here.
       </p>
     </section>
+  );
+}
+
+function FormulaGuideDialog({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4 py-4 backdrop-blur-sm"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        aria-labelledby="formula-guide-title"
+        aria-modal="true"
+        className="w-full max-w-2xl overflow-hidden rounded-lg border border-slate-200 bg-white shadow-soft"
+        role="dialog"
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+          <h2
+            id="formula-guide-title"
+            className="text-sm font-semibold uppercase tracking-wide text-slate-600"
+          >
+            Formula Guide
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md px-2 py-1 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
+          >
+            Close
+          </button>
+        </div>
+        <div className="max-h-[calc(100vh-112px)] overflow-y-auto px-4 py-4 text-sm leading-6 text-slate-600">
+          <div className="grid gap-3">
+            <GuideRow
+              label="Basic form"
+              value={
+                <>
+                  Try <code>A&apos;B + AC</code>, <code>A xor B</code>,{" "}
+                  <code>A xnor B</code>, <code>A nand B</code>, or{" "}
+                  <code>A nor B</code>.
+                </>
+              }
+            />
+            <GuideRow
+              label="Gate words"
+              value={
+                <>
+                  Use <code>and</code>, <code>or</code>, <code>nand</code>,{" "}
+                  <code>nor</code>, <code>xor</code>, and <code>xnor</code>.
+                </>
+              }
+            />
+            <GuideRow
+              label="NOT"
+              value={
+                <>
+                  Write <code>~A</code>, <code>not A</code>, or{" "}
+                  <code>A&apos;</code>.
+                </>
+              }
+            />
+            <GuideRow
+              label="Custom inputs"
+              value={
+                <>
+                  Renamed inputs work in formulas, for example{" "}
+                  <code>A xor B xor Cin</code>. A, B, C, and D remain aliases.
+                </>
+              }
+            />
+            <GuideRow
+              label="Don't-care"
+              value={
+                <>
+                  Click output cells in the K-map or truth table to cycle 0, 1,
+                  and X. X is treated as a don&apos;t-care.
+                </>
+              }
+            />
+            <GuideRow
+              label="Display"
+              value="Use Display to keep only the panels you need on screen."
+            />
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function GuideRow({
+  label,
+  value
+}: {
+  label: string;
+  value: ReactNode;
+}) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+      <span className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+        {label}
+      </span>
+      <div className="mt-1 text-slate-600">{value}</div>
+    </div>
   );
 }
 
