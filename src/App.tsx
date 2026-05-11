@@ -31,7 +31,6 @@ const DEFAULT_PRESET = PRESETS.find((preset) => preset.id === "majority")!;
 type Workspace = "logic" | "cmos" | "review";
 type CopyState = "idle" | "copied" | "failed";
 type LogicPanelId =
-  | "summary"
   | "diagram"
   | "kmap"
   | "forms"
@@ -55,7 +54,6 @@ const DEFAULT_LOGIC_PANELS: PanelVisibility<LogicPanelId> = {
   diagram: true,
   forms: true,
   kmap: true,
-  summary: true,
   truth: false,
   universal: false,
   verilog: false
@@ -68,7 +66,6 @@ const DEFAULT_CMOS_PANELS: PanelVisibility<CmosPanelId> = {
   sizing: false
 };
 const LOGIC_PANEL_OPTIONS: { id: LogicPanelId; label: string }[] = [
-  { id: "summary", label: "Summary" },
   { id: "diagram", label: "Gate diagram" },
   { id: "kmap", label: "K-map" },
   { id: "forms", label: "SOP / POS" },
@@ -168,11 +165,9 @@ export default function App() {
       ].join("\n"),
     [displayLabels, gateConversions, posResult.verilogExpression, result.verilogAssign]
   );
-  const outputSummary = useMemo(() => countOutputs(values), [values]);
   const showLogicMiddleRow = logicPanels.kmap || logicPanels.forms || logicPanels.verilog;
   const showLogicSideColumn = logicPanels.forms || logicPanels.verilog;
   const hasLogicContent =
-    logicPanels.summary ||
     logicPanels.diagram ||
     showLogicMiddleRow ||
     logicPanels.universal ||
@@ -295,35 +290,6 @@ export default function App() {
           onToggleCmosPanel={toggleCmosPanel}
           onToggleLogicPanel={toggleLogicPanel}
         />
-
-        {activeWorkspace === "logic" && logicPanels.summary && (
-          <section className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <StatusCard
-              label="Inputs"
-              value={`${variableCount} variables`}
-              detail={activeDisplayLabels.join(", ")}
-              tone="sky"
-            />
-            <StatusCard
-              label="Truth rows"
-              value={`${truthRows.length}`}
-              detail={`${outputSummary.ones} one, ${outputSummary.zeros} zero, ${outputSummary.dontCares} X`}
-              tone="emerald"
-            />
-            <StatusCard
-              label="SOP terms"
-              value={`${result.terms.length}`}
-              detail={formatSet(result.minterms)}
-              tone="amber"
-            />
-            <StatusCard
-              label="CMOS devices"
-              value={`${cmosPlan.transistorCount}`}
-              detail={cmosPlan.coreGateName}
-              tone="rose"
-            />
-          </section>
-        )}
 
         {activeWorkspace !== "review" && (
         <section className="surface-card relative mb-5 p-4">
@@ -811,38 +777,6 @@ function GuideRow({
   );
 }
 
-function StatusCard({
-  detail,
-  label,
-  tone,
-  value
-}: {
-  detail: string;
-  label: string;
-  tone: "sky" | "emerald" | "amber" | "rose";
-  value: string;
-}) {
-  const toneClass = {
-    sky: "border-sky-200 bg-sky-50 text-sky-700",
-    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    amber: "border-amber-200 bg-amber-50 text-amber-700",
-    rose: "border-rose-200 bg-rose-50 text-rose-700"
-  }[tone];
-
-  return (
-    <div className="surface-card p-3">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-          {label}
-        </span>
-        <span className={`h-2.5 w-2.5 rounded-full border ${toneClass}`} />
-      </div>
-      <div className="mt-2 truncate text-xl font-bold text-slate-950">{value}</div>
-      <div className="mt-1 truncate font-mono text-xs text-slate-500">{detail}</div>
-    </div>
-  );
-}
-
 function WorkspaceTabs({
   activeWorkspace,
   cmosPanels,
@@ -1004,18 +938,6 @@ function formatSet(values: number[]): string {
 
 function formatMaxterms(values: number[]): string {
   return values.length > 0 ? `M(${values.join(", ")})` : "none";
-}
-
-function countOutputs(values: OutputValue[]) {
-  return values.reduce(
-    (counts, value) => {
-      if (value === "1") counts.ones += 1;
-      else if (value === "X") counts.dontCares += 1;
-      else counts.zeros += 1;
-      return counts;
-    },
-    { dontCares: 0, ones: 0, zeros: 0 }
-  );
 }
 
 function sanitizeVariableLabel(value: string): string {
