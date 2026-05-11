@@ -4,7 +4,7 @@
 
 :root {
   color: #172033;
-  background: #f5f7fb;
+  background: #eef3f8;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -35,4 +35,34 @@ code {
   font-family:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     "Courier New", monospace;
+}
+
+::selection {
+  background: rgba(14, 165, 233, 0.22);
+}
+
+@layer components {
+  .app-shell {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0) 240px),
+      radial-gradient(circle at 18% 0%, rgba(14, 165, 233, 0.16), transparent 26rem),
+      radial-gradient(circle at 88% 4%, rgba(16, 185, 129, 0.14), transparent 24rem),
+      #eef3f8;
+  }
+
+  .surface-card {
+    @apply rounded-lg border border-slate-200 bg-white shadow-soft;
+  }
+
+  .control-button {
+    @apply rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 focus-visible:ring-offset-2;
+  }
+
+  .control-button-dark {
+    @apply rounded-md border border-slate-950 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-px hover:bg-slate-800 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 focus-visible:ring-offset-2;
+  }
+
+  .icon-chip {
+    @apply inline-flex min-h-8 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600;
+  }
 }

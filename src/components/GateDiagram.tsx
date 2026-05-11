@@ -508,7 +508,7 @@ function formatTermLabel(
   });
   const usesCustomName = parts.some((part) => part.replace("'", "").length > 1);
 
-  return parts.join(usesCustomName ? "·" : "");
+  return parts.join(usesCustomName ? "*" : "");
 }
 
 function literalRouteKey(

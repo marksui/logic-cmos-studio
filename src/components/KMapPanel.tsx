@@ -34,7 +34,7 @@ export function KMapPanel({ result, onToggle, variableLabels }: KMapPanelProps) 
   });
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white shadow-soft">
+    <div className="surface-card">
       <div className="flex flex-col gap-2 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
           Karnaugh Map
@@ -121,7 +121,7 @@ function KMapRow({
             key={cell.minterm}
             type="button"
             onClick={() => onToggle(cell.minterm)}
-            className={`relative h-20 overflow-hidden rounded-lg border p-2 text-left transition hover:-translate-y-px hover:shadow-md ${cellClass(
+            className={`relative h-20 min-w-16 overflow-hidden rounded-lg border p-2 text-left transition hover:-translate-y-px hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${cellClass(
               cell.value
             )}`}
             aria-label={`Toggle K-map cell for minterm ${cell.minterm}`}
@@ -170,6 +170,6 @@ function formatVariableSet(
   labels?: Record<LogicVariable, string>
 ): string {
   const display = variables.map((variable) => labels?.[variable] ?? variable);
-  const separator = display.every((label) => label.length === 1) ? "" : "·";
+  const separator = display.every((label) => label.length === 1) ? "" : "*";
   return display.join(separator);
 }

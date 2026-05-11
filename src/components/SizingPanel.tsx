@@ -52,7 +52,7 @@ export function SizingPanel({ plan }: SizingPanelProps) {
               key={mode.id}
               type="button"
               onClick={() => updateOption("skewMode", mode.id)}
-              className={`rounded px-2.5 py-1 text-xs font-semibold transition ${
+              className={`rounded px-2.5 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
                 options.skewMode === mode.id
                   ? "bg-white text-slate-900 shadow-sm"
                   : "text-slate-500 hover:text-slate-800"
@@ -186,7 +186,7 @@ function Control({
           step={step}
           value={value}
           onChange={(event) => onChange(clamp(Number(event.target.value), min, max))}
-          className="w-16 rounded border border-slate-200 bg-white px-2 py-1 text-right text-xs font-semibold text-slate-700 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+          className="w-16 rounded border border-slate-200 bg-white px-2 py-1 text-right text-xs font-semibold text-slate-700 outline-none focus:border-slate-900 focus:ring-2 focus:ring-sky-500/20"
         />
       </span>
       <input
@@ -196,7 +196,7 @@ function Control({
         step={step}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="mt-3 w-full accent-slate-900"
+        className="mt-3 w-full accent-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
       />
     </label>
   );

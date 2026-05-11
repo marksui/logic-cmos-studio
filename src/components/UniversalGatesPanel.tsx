@@ -14,7 +14,7 @@ export function UniversalGatesPanel({
   variableLabels
 }: UniversalGatesPanelProps) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+    <section className="surface-card p-4">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
         Universal Gate Conversion
       </h2>
@@ -49,7 +49,7 @@ function ConversionCard({
       : "border-emerald-100 bg-emerald-50/40 text-emerald-700";
 
   return (
-    <article className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+    <article className="rounded-lg border border-slate-200 bg-slate-50 p-3 transition hover:border-slate-300 hover:bg-white">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold text-slate-800">

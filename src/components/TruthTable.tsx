@@ -14,7 +14,7 @@ export function TruthTable({
   onToggle
 }: TruthTableProps) {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-soft">
+    <div className="surface-card overflow-hidden">
       <div className="border-b border-slate-200 px-4 py-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
           Truth Table
@@ -58,7 +58,7 @@ export function TruthTable({
                   <button
                     type="button"
                     onClick={() => onToggle(row.index)}
-                    className={`h-8 w-12 rounded-md border text-sm font-semibold transition hover:-translate-y-px hover:shadow-sm ${outputClass(
+                    className={`h-8 w-12 rounded-md border text-sm font-semibold transition hover:-translate-y-px hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${outputClass(
                       row.value
                     )}`}
                     aria-label={`Toggle output for minterm ${row.index}`}

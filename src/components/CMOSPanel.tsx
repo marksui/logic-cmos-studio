@@ -18,7 +18,7 @@ export function CMOSPanel({
   const [symbolStyle, setSymbolStyle] = useState<CmosSymbolStyle>("compact");
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+    <section className="surface-card p-4">
       <div className="relative flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
           Static CMOS Schematic
@@ -34,7 +34,7 @@ export function CMOSPanel({
                   key={label}
                   type="button"
                   onClick={() => onIncludeOutputInverterChange(include)}
-                  className={`rounded px-2.5 py-1 text-xs font-semibold transition ${
+                  className={`rounded px-2.5 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
                     includeOutputInverter === include
                       ? "bg-white text-slate-900 shadow-sm"
                       : "text-slate-500 hover:text-slate-800"
@@ -52,7 +52,7 @@ export function CMOSPanel({
           <button
             type="button"
             onClick={() => setStyleOpen((open) => !open)}
-            className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-white"
+            className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
             aria-expanded={styleOpen}
           >
             Style
@@ -76,7 +76,7 @@ export function CMOSPanel({
                       setSymbolStyle(style);
                       setStyleOpen(false);
                     }}
-                    className={`rounded-md border px-3 py-2 text-left transition hover:bg-slate-50 ${
+                    className={`rounded-md border px-3 py-2 text-left transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
                       symbolStyle === style
                         ? "border-slate-900 bg-slate-50"
                         : "border-slate-200 bg-white"

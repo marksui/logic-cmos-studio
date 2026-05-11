@@ -132,7 +132,13 @@ function tokenize(
       continue;
     }
 
-    if (char === "&" || char === "*" || char === "." || char === "·" || char === "⋅") {
+    if (
+      char === "&" ||
+      char === "*" ||
+      char === "." ||
+      char === "\u00b7" ||
+      char === "\u22c5"
+    ) {
       tokens.push({ type: "op", value: "and" });
       index += 1;
       continue;
