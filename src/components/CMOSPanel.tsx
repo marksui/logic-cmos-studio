@@ -33,17 +33,41 @@ export function CMOSPanel({
   const panelRef = useRef<HTMLElement | null>(null);
 
   function exportSchematicSvg() {
-    const svg = panelRef.current?.querySelector("svg");
+    const svg = getSchematicSvg(panelRef.current);
     if (!svg) return;
 
-    const source = new XMLSerializer().serializeToString(svg);
+    const source = serializeStandaloneSvg(svg);
     const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `logic-cmos-${plan.coreGateName.toLowerCase().replace(/\s+/g, "-")}.svg`;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, exportFileName(plan.coreGateName, "svg"));
+  }
+
+  async function exportSchematicPng() {
+    const svg = getSchematicSvg(panelRef.current);
+    if (!svg) return;
+
+    const source = serializeStandaloneSvg(svg);
+    const svgBlob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(svgBlob);
+
+    try {
+      const image = await loadImage(url);
+      const { height, width } = getSvgSize(svg);
+      const scale = 2;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(width * scale);
+      canvas.height = Math.ceil(height * scale);
+
+      const context = canvas.getContext("2d");
+      if (!context) return;
+
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const pngBlob = await canvasToBlob(canvas);
+      downloadBlob(pngBlob, exportFileName(plan.coreGateName, "png"));
+    } finally {
+      URL.revokeObjectURL(url);
+    }
   }
 
   return (
@@ -83,6 +107,13 @@ export function CMOSPanel({
                 className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
               >
                 Export SVG
+              </button>
+              <button
+                type="button"
+                onClick={exportSchematicPng}
+                className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
+              >
+                Export PNG
               </button>
               <button
                 type="button"
@@ -377,6 +408,125 @@ function TransistorChip({
       {kind.toUpperCase()}({label})
     </span>
   );
+}
+
+type ExportFormat = "png" | "svg";
+
+function getSchematicSvg(root: HTMLElement | null): SVGSVGElement | null {
+  return root?.querySelector<SVGSVGElement>("svg") ?? null;
+}
+
+function serializeStandaloneSvg(svg: SVGSVGElement): string {
+  const clone = svg.cloneNode(true) as SVGSVGElement;
+  inlineSvgStyles(svg, clone);
+
+  const { height, width } = getSvgSize(svg);
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  clone.setAttribute("width", `${width}`);
+  clone.setAttribute("height", `${height}`);
+  clone.setAttribute(
+    "viewBox",
+    clone.getAttribute("viewBox") ?? `0 0 ${width} ${height}`
+  );
+  clone.removeAttribute("class");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(
+    clone
+  )}`;
+}
+
+function inlineSvgStyles(source: Element, target: Element) {
+  const computed = window.getComputedStyle(source);
+  const styleProperties = [
+    "dominant-baseline",
+    "fill",
+    "fill-opacity",
+    "font-family",
+    "font-size",
+    "font-weight",
+    "letter-spacing",
+    "opacity",
+    "stroke",
+    "stroke-dasharray",
+    "stroke-linecap",
+    "stroke-linejoin",
+    "stroke-opacity",
+    "stroke-width",
+    "text-anchor"
+  ];
+  const inlineStyles = styleProperties
+    .map((property) => {
+      const value = computed.getPropertyValue(property);
+      return value ? `${property}:${value}` : "";
+    })
+    .filter(Boolean)
+    .join(";");
+
+  if (inlineStyles) {
+    target.setAttribute("style", inlineStyles);
+  }
+  target.removeAttribute("class");
+
+  Array.from(source.children).forEach((sourceChild, index) => {
+    const targetChild = target.children[index];
+    if (targetChild) {
+      inlineSvgStyles(sourceChild, targetChild);
+    }
+  });
+}
+
+function getSvgSize(svg: SVGSVGElement): { height: number; width: number } {
+  const viewBox = svg.viewBox.baseVal;
+  if (viewBox.width > 0 && viewBox.height > 0) {
+    return { height: viewBox.height, width: viewBox.width };
+  }
+
+  const bounds = svg.getBoundingClientRect();
+  return {
+    height: Math.max(1, bounds.height),
+    width: Math.max(1, bounds.width)
+  };
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportFileName(gateName: string, format: ExportFormat): string {
+  const slug =
+    gateName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "schematic";
+
+  return `logic-cmos-${slug}.${format}`;
+}
+
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Could not render exported SVG."));
+    image.src = url;
+  });
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+        return;
+      }
+
+      reject(new Error("Could not create PNG export."));
+    }, "image/png");
+  });
 }
 
 function compactNetworkExpression(node: CmosNetworkNode): string {
