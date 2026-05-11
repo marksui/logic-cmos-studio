@@ -5,6 +5,7 @@ type FormulaNode =
   | { type: "const"; value: boolean }
   | { type: "var"; name: LogicVariable }
   | { type: "not"; child: FormulaNode }
+  | { type: "buffer"; child: FormulaNode }
   | { type: BinaryOperator; left: FormulaNode; right: FormulaNode };
 
 type BinaryOperator = "and" | "nand" | "or" | "nor" | "xor" | "xnor";
@@ -13,7 +14,7 @@ type FormulaVariableLabels = Partial<Record<LogicVariable, string>>;
 type Token =
   | { type: "var"; value: LogicVariable }
   | { type: "const"; value: boolean }
-  | { type: "op"; value: BinaryOperator | "not" }
+  | { type: "op"; value: BinaryOperator | "buffer" | "not" }
   | { type: "postfixNot" }
   | { type: "lparen" }
   | { type: "rparen" };
@@ -26,6 +27,8 @@ interface FormulaEvaluation {
 const LOGIC_VARIABLES: LogicVariable[] = ["A", "B", "C", "D"];
 const RESERVED_WORDS = new Set([
   "AND",
+  "BUF",
+  "BUFFER",
   "FALSE",
   "INV",
   "NAND",
@@ -201,6 +204,8 @@ function tokenize(
         tokens.push({ type: "op", value: "xnor" });
       } else if (word === "NOT" || word === "INV") {
         tokens.push({ type: "op", value: "not" });
+      } else if (word === "BUFFER" || word === "BUF") {
+        tokens.push({ type: "op", value: "buffer" });
       } else if (word === "TRUE") {
         tokens.push({ type: "const", value: true });
       } else if (word === "FALSE") {
@@ -213,14 +218,14 @@ function tokenize(
         }
       } else {
         throw new Error(
-          "Use your variable names or A, B, C, D with operators AND, OR, NOT, NAND, NOR, XOR, XNOR."
+          "Use your variable names or A, B, C, D with operators AND, OR, NOT, BUFFER, NAND, NOR, XOR, XNOR."
         );
       }
       continue;
     }
 
     throw new Error(
-      `Unexpected character "${char}". Use A-D plus words like nand, nor, xor, xnor, or the symbols shown in Guide.`
+      `Unexpected character "${char}". Use A-D plus words like buffer, nand, nor, xor, xnor, or the symbols shown in Guide.`
     );
   }
 
@@ -261,7 +266,7 @@ function canStartExpression(token: Token): boolean {
     token.type === "var" ||
     token.type === "const" ||
     token.type === "lparen" ||
-    (token.type === "op" && token.value === "not")
+    (token.type === "op" && (token.value === "buffer" || token.value === "not"))
   );
 }
 
@@ -333,6 +338,13 @@ class FormulaParser {
       };
     }
 
+    if (this.matchOperator("buffer")) {
+      return {
+        type: "buffer",
+        child: this.parseUnary()
+      };
+    }
+
     return this.parsePostfix();
   }
 
@@ -385,7 +397,7 @@ class FormulaParser {
     return true;
   }
 
-  private matchOperator(operator: BinaryOperator | "not"): boolean {
+  private matchOperator(operator: BinaryOperator | "buffer" | "not"): boolean {
     const token = this.peek();
     if (token?.type !== "op" || token.value !== operator) {
       return false;
@@ -407,7 +419,7 @@ class FormulaParser {
 
   private previousOperator(): BinaryOperator {
     const token = this.tokens[this.index - 1];
-    if (token?.type !== "op" || token.value === "not") {
+    if (token?.type !== "op" || token.value === "buffer" || token.value === "not") {
       throw new Error("Internal parser error.");
     }
 
@@ -443,7 +455,7 @@ function pickVariableCount(
 function collectVariables(ast: FormulaNode): LogicVariable[] {
   if (ast.type === "var") return [ast.name];
   if (ast.type === "const") return [];
-  if (ast.type === "not") return collectVariables(ast.child);
+  if (ast.type === "buffer" || ast.type === "not") return collectVariables(ast.child);
 
   return [...collectVariables(ast.left), ...collectVariables(ast.right)];
 }
@@ -458,6 +470,7 @@ function evaluateNode(
 ): boolean {
   if (node.type === "const") return node.value;
   if (node.type === "var") return context.get(node.name) ?? false;
+  if (node.type === "buffer") return evaluateNode(node.child, context);
   if (node.type === "not") return !evaluateNode(node.child, context);
 
   const left = evaluateNode(node.left, context);

@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { CMOSPanel } from "./components/CMOSPanel";
 import { GateDiagram, type GateWireStyle } from "./components/GateDiagram";
 import { KMapPanel } from "./components/KMapPanel";
+import { LogicGateReview } from "./components/LogicGateReview";
 import { TruthTable } from "./components/TruthTable";
 import { UniversalGatesPanel } from "./components/UniversalGatesPanel";
 import { buildCmosPlan } from "./logic/cmos";
@@ -27,7 +28,7 @@ import type {
 
 const VARIABLE_COUNTS: VariableCount[] = [2, 3, 4];
 const DEFAULT_PRESET = PRESETS.find((preset) => preset.id === "majority")!;
-type Workspace = "logic" | "cmos";
+type Workspace = "logic" | "cmos" | "review";
 type CopyState = "idle" | "copied" | "failed";
 type LogicPanelId =
   | "summary"
@@ -40,7 +41,16 @@ type LogicPanelId =
 type CmosPanelId = "overview" | "networks" | "sizing" | "schematic" | "netlist";
 type PanelVisibility<T extends string> = Record<T, boolean>;
 
-const FORMULA_EXAMPLES = ["A'B + AC", "A xor B", "A xnor B", "A nand B", "A nor B"];
+const FORMULA_EXAMPLES = [
+  "buffer A",
+  "not A",
+  "A and B",
+  "A or B",
+  "A xor B",
+  "A xnor B",
+  "A nand B",
+  "A nor B"
+];
 const DEFAULT_LOGIC_PANELS: PanelVisibility<LogicPanelId> = {
   diagram: true,
   forms: true,
@@ -273,6 +283,18 @@ export default function App() {
       </header>
 
       <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+        <WorkspaceTabs
+          activeWorkspace={activeWorkspace}
+          cmosPanels={cmosPanels}
+          displayOpen={displayOpen}
+          logicPanels={logicPanels}
+          onChange={setActiveWorkspace}
+          onDisplayOpenChange={setDisplayOpen}
+          onResetDisplay={resetDisplay}
+          onToggleCmosPanel={toggleCmosPanel}
+          onToggleLogicPanel={toggleLogicPanel}
+        />
+
         {activeWorkspace === "logic" && logicPanels.summary && (
           <section className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <StatusCard
@@ -302,6 +324,7 @@ export default function App() {
           </section>
         )}
 
+        {activeWorkspace !== "review" && (
         <section className="surface-card relative mb-5 p-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
@@ -494,20 +517,9 @@ export default function App() {
             )}
           </form>
         </section>
+        )}
 
         {guideOpen && <FormulaGuideDialog onClose={() => setGuideOpen(false)} />}
-
-        <WorkspaceTabs
-          activeWorkspace={activeWorkspace}
-          cmosPanels={cmosPanels}
-          displayOpen={displayOpen}
-          logicPanels={logicPanels}
-          onChange={setActiveWorkspace}
-          onDisplayOpenChange={setDisplayOpen}
-          onResetDisplay={resetDisplay}
-          onToggleCmosPanel={toggleCmosPanel}
-          onToggleLogicPanel={toggleLogicPanel}
-        />
 
         {activeWorkspace === "logic" ? (
           <>
@@ -650,7 +662,7 @@ export default function App() {
               </div>
             )}
           </>
-        ) : (
+        ) : activeWorkspace === "cmos" ? (
           <div className="space-y-5">
             {!hasCmosContent ? (
               <EmptyView workspace="CMOS" />
@@ -663,6 +675,8 @@ export default function App() {
               />
             )}
           </div>
+        ) : (
+          <LogicGateReview />
         )}
       </div>
     </main>
@@ -717,9 +731,9 @@ function FormulaGuideDialog({ onClose }: { onClose: () => void }) {
               label="Basic form"
               value={
                 <>
-                  Try <code>A&apos;B + AC</code>, <code>A xor B</code>,{" "}
-                  <code>A xnor B</code>, <code>A nand B</code>, or{" "}
-                  <code>A nor B</code>.
+                  Try <code>buffer A</code>, <code>not A</code>,{" "}
+                  <code>A xor B</code>, <code>A xnor B</code>,{" "}
+                  <code>A nand B</code>, or <code>A nor B</code>.
                 </>
               }
             />
@@ -727,8 +741,9 @@ function FormulaGuideDialog({ onClose }: { onClose: () => void }) {
               label="Gate words"
               value={
                 <>
-                  Use <code>and</code>, <code>or</code>, <code>nand</code>,{" "}
-                  <code>nor</code>, <code>xor</code>, and <code>xnor</code>.
+                  Use <code>buffer</code>, <code>and</code>, <code>or</code>,{" "}
+                  <code>nand</code>, <code>nor</code>, <code>xor</code>, and{" "}
+                  <code>xnor</code>.
                 </>
               }
             />
@@ -762,6 +777,10 @@ function FormulaGuideDialog({ onClose }: { onClose: () => void }) {
             <GuideRow
               label="Display"
               value="Use Display to keep only the panels you need on screen."
+            />
+            <GuideRow
+              label="Review"
+              value="Open Review to see every supported gate symbol with its truth table."
             />
           </div>
         </div>
@@ -840,18 +859,34 @@ function WorkspaceTabs({
   onToggleCmosPanel: (panel: CmosPanelId) => void;
   onToggleLogicPanel: (panel: LogicPanelId) => void;
 }) {
+  const hasDisplayControls = activeWorkspace !== "review";
   const activeOptions =
-    activeWorkspace === "logic" ? LOGIC_PANEL_OPTIONS : CMOS_PANEL_OPTIONS;
+    activeWorkspace === "logic"
+      ? LOGIC_PANEL_OPTIONS
+      : activeWorkspace === "cmos"
+        ? CMOS_PANEL_OPTIONS
+        : [];
   const activePanels = activeWorkspace === "logic" ? logicPanels : cmosPanels;
-  const selectedCount = Object.values(activePanels).filter(Boolean).length;
+  const selectedCount = hasDisplayControls
+    ? Object.values(activePanels).filter(Boolean).length
+    : 0;
 
   return (
     <div className="sticky top-3 z-10 mb-5 rounded-lg border border-slate-200 bg-white/90 p-1 shadow-soft backdrop-blur">
-      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_132px]">
-        <div className="grid gap-2 sm:grid-cols-2">
-          {(["logic", "cmos"] as Workspace[]).map((workspace) => {
+      <div
+        className={`grid gap-2 ${
+          hasDisplayControls ? "sm:grid-cols-[minmax(0,1fr)_132px]" : ""
+        }`}
+      >
+        <div className="grid gap-2 sm:grid-cols-3">
+          {(["logic", "cmos", "review"] as Workspace[]).map((workspace) => {
             const active = workspace === activeWorkspace;
-            const label = workspace === "logic" ? "Logic" : "CMOS";
+            const label =
+              workspace === "logic"
+                ? "Logic"
+                : workspace === "cmos"
+                  ? "CMOS"
+                  : "Review";
 
             return (
               <button
@@ -874,6 +909,7 @@ function WorkspaceTabs({
           })}
         </div>
 
+        {hasDisplayControls && (
         <div className="relative">
           <button
             type="button"
@@ -929,6 +965,7 @@ function WorkspaceTabs({
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );
