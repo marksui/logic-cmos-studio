@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { CMOSPanel } from "./components/CMOSPanel";
 import { GateDiagram, type GateWireStyle } from "./components/GateDiagram";
 import { KMapPanel } from "./components/KMapPanel";
@@ -54,6 +54,93 @@ const FORMULA_EXAMPLES = [
   "A nand B",
   "A nor B",
   "SA + SB"
+];
+const GUIDE_EXAMPLES = [
+  {
+    label: "SOP starter",
+    formula: "A'B + AC",
+    note: "Classic sum-of-products with postfix NOT."
+  },
+  {
+    label: "Custom names",
+    formula: "SA + SB",
+    note: "Variable labels are detected from the formula."
+  },
+  {
+    label: "Parity",
+    formula: "A xor B xor C",
+    note: "XOR chains are parsed left to right."
+  },
+  {
+    label: "OAI21",
+    formula: "not ((A or B) and C)",
+    note: "OR-AND-Invert complex CMOS form."
+  },
+  {
+    label: "AOI22",
+    formula: "not ((A and B) or (C and D))",
+    note: "AND-OR-Invert with four inputs."
+  },
+  {
+    label: "Named carry",
+    formula: "CarryIn xor Sum",
+    note: "Names can use letters, numbers, and underscores."
+  }
+];
+const GUIDE_OPERATORS = [
+  {
+    label: "NOT",
+    aliases: ["not A", "~A", "!A", "A'"],
+    description: "Invert a signal before or after the variable."
+  },
+  {
+    label: "AND",
+    aliases: ["A and B", "AB", "A * B", "A & B"],
+    description: "Adjacent variables imply AND, so AB is valid."
+  },
+  {
+    label: "OR",
+    aliases: ["A or B", "A + B", "A | B"],
+    description: "Use words or symbols for sum terms."
+  },
+  {
+    label: "XOR / XNOR",
+    aliases: ["A xor B", "A xnor B", "A ^ B"],
+    description: "Use for parity and equality logic."
+  },
+  {
+    label: "NAND / NOR",
+    aliases: ["A nand B", "A nor B"],
+    description: "Universal gates can be typed directly."
+  },
+  {
+    label: "BUFFER",
+    aliases: ["buffer A", "buf A"],
+    description: "Keep a signal non-inverted."
+  }
+];
+const GUIDE_COMPLEX_CMOS = [
+  { label: "AOI21", formula: "not ((A and B) or C)" },
+  { label: "AOI22", formula: "not ((A and B) or (C and D))" },
+  { label: "OAI21", formula: "not ((A or B) and C)" },
+  { label: "OAI22", formula: "not ((A or B) and (C or D))" }
+];
+const GUIDE_RULES = [
+  {
+    label: "1",
+    title: "Group with parentheses",
+    text: "Use parentheses for AOI/OAI and any expression where the gate order matters."
+  },
+  {
+    label: "2",
+    title: "Variables auto-map",
+    text: `New names map to the next free input, up to ${MAX_VARIABLE_COUNT} inputs.`
+  },
+  {
+    label: "3",
+    title: "Review everything",
+    text: "Open Review when you want every supported gate, symbol, and truth table in one page."
+  }
 ];
 const DEFAULT_LOGIC_PANELS: PanelVisibility<LogicPanelId> = {
   diagram: true,
@@ -256,6 +343,29 @@ export default function App() {
         error instanceof Error ? error.message : "Could not parse the formula."
       );
     }
+  }
+
+  function useGuideFormula(formula: string) {
+    try {
+      const evaluation = evaluateFormula(
+        formula,
+        variableCount,
+        DEFAULT_INPUT_LABELS
+      );
+      setVariableCount(evaluation.variableCount);
+      setInputLabels(evaluation.variableLabels);
+      setRawValues(evaluation.values);
+      setFormulaInput(formula);
+      setFormulaError("");
+    } catch (error) {
+      setFormulaInput(formula);
+      setFormulaError(
+        error instanceof Error ? error.message : "Could not parse the formula."
+      );
+    }
+
+    setGuideOpen(false);
+    setPresetsOpen(false);
   }
 
   async function copyVerilog() {
@@ -516,7 +626,12 @@ export default function App() {
         </section>
         )}
 
-        {guideOpen && <FormulaGuideDialog onClose={() => setGuideOpen(false)} />}
+        {guideOpen && (
+          <FormulaGuideDialog
+            onClose={() => setGuideOpen(false)}
+            onUseFormula={useGuideFormula}
+          />
+        )}
 
         {activeWorkspace === "logic" ? (
           <>
@@ -692,10 +807,16 @@ function EmptyView({ workspace }: { workspace: Workspace | "Logic" | "CMOS" }) {
   );
 }
 
-function FormulaGuideDialog({ onClose }: { onClose: () => void }) {
+function FormulaGuideDialog({
+  onClose,
+  onUseFormula
+}: {
+  onClose: () => void;
+  onUseFormula: (formula: string) => void;
+}) {
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 px-4 py-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-3 py-4 backdrop-blur-sm sm:px-5"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
@@ -704,92 +825,191 @@ function FormulaGuideDialog({ onClose }: { onClose: () => void }) {
       <section
         aria-labelledby="formula-guide-title"
         aria-modal="true"
-        className="w-full max-w-2xl overflow-hidden rounded-lg border border-slate-200 bg-white shadow-soft"
+        className="flex max-h-[calc(100vh-32px)] w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-soft"
         role="dialog"
       >
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
-          <h2
-            id="formula-guide-title"
-            className="text-sm font-semibold uppercase tracking-wide text-slate-600"
-          >
-            Formula Guide
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md px-2 py-1 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
-          >
-            Close
-          </button>
+        <div className="bg-slate-950 px-4 py-4 text-white sm:px-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-sky-200">
+                Formula Guide
+              </p>
+              <h2
+                id="formula-guide-title"
+                className="mt-1 text-2xl font-semibold tracking-normal text-white sm:text-3xl"
+              >
+                Build logic from readable formulas
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                Type gate words, symbols, custom variable names, and AOI/OAI
+                forms. The workspace detects labels and input count from the
+                expression.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 rounded-md border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/40"
+              aria-label="Close Formula Guide"
+            >
+              Close
+            </button>
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <div className="rounded-md border border-white/10 bg-white/10 px-3 py-2">
+              <span className="block text-[11px] font-bold uppercase tracking-wide text-sky-200">
+                Variables
+              </span>
+              <span className="mt-1 block text-sm font-semibold text-white">
+                Auto-detect up to {MAX_VARIABLE_COUNT}
+              </span>
+            </div>
+            <div className="rounded-md border border-white/10 bg-white/10 px-3 py-2">
+              <span className="block text-[11px] font-bold uppercase tracking-wide text-emerald-200">
+                Gates
+              </span>
+              <span className="mt-1 block text-sm font-semibold text-white">
+                AND, OR, NOT, XOR, NAND, NOR
+              </span>
+            </div>
+            <div className="rounded-md border border-white/10 bg-white/10 px-3 py-2">
+              <span className="block text-[11px] font-bold uppercase tracking-wide text-amber-200">
+                Complex CMOS
+              </span>
+              <span className="mt-1 block text-sm font-semibold text-white">
+                AOI and OAI patterns included
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="max-h-[calc(100vh-112px)] overflow-y-auto px-4 py-4 text-sm leading-6 text-slate-600">
-          <div className="grid gap-3">
-            <GuideRow
-              label="Basic form"
-              value={
-                <>
-                  Try <code>buffer A</code>, <code>not A</code>,{" "}
-                  <code>A xor B</code>, <code>A xnor B</code>,{" "}
-                  <code>A nand B</code>, or <code>A nor B</code>.
-                </>
-              }
-            />
-            <GuideRow
-              label="Gate words"
-              value={
-                <>
-                  Use <code>buffer</code>, <code>and</code>, <code>or</code>,{" "}
-                  <code>nand</code>, <code>nor</code>, <code>xor</code>, and{" "}
-                  <code>xnor</code>.
-                </>
-              }
-            />
-            <GuideRow
-              label="Complex CMOS"
-              value={
-                <>
-                  Presets include <code>AOI21</code>, <code>AOI22</code>,{" "}
-                  <code>OAI21</code>, and <code>OAI22</code>; they auto-detect
-                  variables from the formula.
-                </>
-              }
-            />
-            <GuideRow
-              label="NOT"
-              value={
-                <>
-                  Write <code>~A</code>, <code>not A</code>, or{" "}
-                  <code>A&apos;</code>.
-                </>
-              }
-            />
-            <GuideRow
-              label="Custom inputs"
-              value={
-                <>
-                  Type names directly, for example <code>SA + SB</code>,{" "}
-                  <code>S xor A</code>, or <code>Cin xor Sum</code>. New names
-                  map to the next free input, up to {MAX_VARIABLE_COUNT} total.
-                </>
-              }
-            />
-            <GuideRow
-              label="Don't-care"
-              value={
-                <>
-                  Click output cells in the K-map or truth table to cycle 0, 1,
-                  and X. X is treated as a don&apos;t-care.
-                </>
-              }
-            />
-            <GuideRow
-              label="Display"
-              value="Use Display to keep only the panels you need on screen."
-            />
-            <GuideRow
-              label="Review"
-              value="Open Review to see every supported gate symbol with its truth table."
-            />
+        <div className="overflow-y-auto bg-slate-50 px-4 py-4 text-sm text-slate-600 sm:px-5">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)]">
+            <section className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">
+                    Try A Formula
+                  </h3>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    Click a sample to run it and update the workspace.
+                  </p>
+                </div>
+                <span className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">
+                  live examples
+                </span>
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {GUIDE_EXAMPLES.map((example) => (
+                  <button
+                    key={example.formula}
+                    type="button"
+                    onClick={() => onUseFormula(example.formula)}
+                    className="min-h-[112px] rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-left transition hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 text-sm font-semibold text-slate-800">
+                        {example.label}
+                      </span>
+                      <span className="shrink-0 rounded bg-white px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                        Run
+                      </span>
+                    </span>
+                    <code className="mt-2 block break-words rounded bg-white px-2 py-1.5 text-xs leading-5 text-slate-700">
+                      {example.formula}
+                    </code>
+                    <span className="mt-2 block text-xs leading-5 text-slate-500">
+                      {example.note}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-slate-200 bg-white p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">
+                Read Order
+              </h3>
+              <div className="mt-3 space-y-3">
+                {GUIDE_RULES.map((rule) => (
+                  <GuideRule key={rule.label} {...rule} />
+                ))}
+              </div>
+              <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-3">
+                <span className="block text-xs font-bold uppercase tracking-wide text-emerald-700">
+                  Custom Variable Names
+                </span>
+                <p className="mt-1 text-xs leading-5 text-emerald-800">
+                  Use names like <code>SA</code>, <code>SB</code>,{" "}
+                  <code>CarryIn</code>, or <code>req_0</code>. Names are
+                  cleaned for display and mapped automatically.
+                </p>
+              </div>
+              <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-3">
+                <span className="block text-xs font-bold uppercase tracking-wide text-amber-700">
+                  Don't-care
+                </span>
+                <p className="mt-1 text-xs leading-5 text-amber-800">
+                  Click K-map or truth-table outputs to cycle 0, 1, and X. X is
+                  treated as a simplification don't-care.
+                </p>
+              </div>
+            </section>
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <section className="rounded-lg border border-slate-200 bg-white p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">
+                Operator Cheat Sheet
+              </h3>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {GUIDE_OPERATORS.map((operator) => (
+                  <GuideOperator key={operator.label} {...operator} />
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">
+                    AOI / OAI Map
+                  </h3>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    Pick one when you want complex CMOS without rewriting it by
+                    hand.
+                  </p>
+                </div>
+                <span className="rounded-md bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-800">
+                  presets
+                </span>
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {GUIDE_COMPLEX_CMOS.map((gate) => (
+                  <button
+                    key={gate.label}
+                    type="button"
+                    onClick={() => onUseFormula(gate.formula)}
+                    className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-left transition hover:border-slate-300 hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
+                  >
+                    <span className="block text-sm font-semibold text-slate-800">
+                      {gate.label}
+                    </span>
+                    <code className="mt-2 block break-words text-xs leading-5 text-slate-600">
+                      {gate.formula}
+                    </code>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-3">
+                <span className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Display Control
+                </span>
+                <p className="mt-1 text-xs leading-5 text-slate-600">
+                  Use Display to keep the main screen quiet, then open Review
+                  for the full gate symbol and truth-table reference.
+                </p>
+              </div>
+            </section>
           </div>
         </div>
       </section>
@@ -797,19 +1017,55 @@ function FormulaGuideDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-function GuideRow({
+function GuideRule({
   label,
-  value
+  title,
+  text
 }: {
   label: string;
-  value: ReactNode;
+  title: string;
+  text: string;
 }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-      <span className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+    <div className="flex gap-3">
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-slate-900 text-xs font-bold text-white">
         {label}
       </span>
-      <div className="mt-1 text-slate-600">{value}</div>
+      <div className="min-w-0">
+        <span className="block text-sm font-semibold text-slate-800">
+          {title}
+        </span>
+        <p className="mt-0.5 text-xs leading-5 text-slate-500">{text}</p>
+      </div>
+    </div>
+  );
+}
+
+function GuideOperator({
+  label,
+  aliases,
+  description
+}: {
+  label: string;
+  aliases: string[];
+  description: string;
+}) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3">
+      <span className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </span>
+      <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {aliases.map((alias) => (
+          <code
+            key={alias}
+            className="rounded border border-slate-200 bg-white px-1.5 py-1 text-[11px] leading-none text-slate-700"
+          >
+            {alias}
+          </code>
+        ))}
+      </div>
     </div>
   );
 }
