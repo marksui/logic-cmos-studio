@@ -2,7 +2,7 @@
 
 Logic & CMOS Studio is a browser-based educational EDA mini-tool that converts Boolean logic into truth tables, Karnaugh maps, simplified equations, Verilog, and static CMOS pull-up / pull-down schematics.
 
-- Version: v1.3.11
+- Version: v1.3.12
 - GitHub Pages: https://marksui.github.io/logic-cmos-studio/
 
 ## Features
