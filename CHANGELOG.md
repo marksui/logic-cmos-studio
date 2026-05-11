@@ -2,6 +2,10 @@
 
 All notable changes to Logic & CMOS Studio are summarized here.
 
+## v1.3.15 - 2026-05-11
+
+- Trimmed README by removing local run, build, GitHub Pages deployment, and project rationale sections from the public-facing document.
+
 ## v1.3.14 - 2026-05-11
 
 - Added real high-resolution screenshots under `docs/screenshots/`.

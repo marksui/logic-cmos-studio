@@ -2,7 +2,7 @@
 
 Logic & CMOS Studio is a browser-based educational EDA mini-tool that converts Boolean logic into truth tables, Karnaugh maps, simplified equations, Verilog, and static CMOS pull-up / pull-down schematics.
 
-- Version: v1.3.14
+- Version: v1.3.15
 - GitHub Pages: https://marksui.github.io/logic-cmos-studio/
 
 ## Features
@@ -50,41 +50,3 @@ The app is a Vite, React, and TypeScript single-page application. The logic engi
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.
-
-## Run Locally
-
-```bash
-npm install
-npm run dev
-```
-
-Then open the Vite local URL shown in the terminal.
-
-## Build
-
-```bash
-npm run build
-npm run test:formula
-```
-
-## Deploy To GitHub Pages
-
-This project is configured with:
-
-```json
-"homepage": "https://marksui.github.io/logic-cmos-studio/"
-```
-
-Build the app and push the committed `dist/` output to `main`:
-
-```bash
-npm run build
-git add -A
-git commit -m "Release vX.Y.Z"
-git tag -a vX.Y.Z -m "vX.Y.Z"
-git push origin main --follow-tags
-```
-
-## Why This Project
-
-Boolean logic is the bridge between high-level digital design and transistor-level implementation. This studio connects the flow in one place: a Boolean equation becomes a truth table, the truth table becomes a Karnaugh map, the map becomes simplified SOP/POS equations, the equations become RTL-style Verilog, and the same logic can be inspected as static CMOS pull-up and pull-down networks for VLSI learning.
