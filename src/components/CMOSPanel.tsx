@@ -29,7 +29,7 @@ export function CMOSPanel({
   }
 }: CMOSPanelProps) {
   const [styleOpen, setStyleOpen] = useState(false);
-  const [symbolStyle, setSymbolStyle] = useState<CmosSymbolStyle>("compact");
+  const [symbolStyle, setSymbolStyle] = useState<CmosSymbolStyle>("textbook");
 
   return (
     <section className="surface-card p-4">
@@ -60,9 +60,6 @@ export function CMOSPanel({
               ))}
             </div>
           )}
-          <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600">
-            {plan.coreGateName}
-          </span>
           {visibleSections.schematic && (
             <button
               type="button"

@@ -73,7 +73,7 @@ export function buildCmosPlan(
     : simplifiedAst;
   const outputInverterAvailable = !isInvertedLiteral;
   const outputInverterIncluded =
-    outputInverterAvailable && options.includeOutputInverter !== false;
+    outputInverterAvailable && options.includeOutputInverter === true;
   const requiresOutputInverter = outputInverterIncluded;
   const coreOutputNode = outputInverterAvailable ? "nY" : "Y";
   const normalizedCoreAst = toNnf(normalizeAst(coreAst));

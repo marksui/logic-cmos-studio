@@ -108,7 +108,7 @@ export default function App() {
   const [inputLabels, setInputLabels] =
     useState<Record<LogicVariable, string>>(DEFAULT_INPUT_LABELS);
   const [gateWireStyle, setGateWireStyle] = useState<GateWireStyle>("straight");
-  const [includeOutputInverter, setIncludeOutputInverter] = useState(true);
+  const [includeOutputInverter, setIncludeOutputInverter] = useState(false);
   const [copyState, setCopyState] = useState<CopyState>("idle");
 
   const values = useMemo(
