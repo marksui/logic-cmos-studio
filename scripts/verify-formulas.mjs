@@ -7,6 +7,7 @@ const bundle = await build({
   format: "esm",
   stdin: {
     contents: `
+      export { buildCmosPlan } from "./src/logic/cmos.ts";
       export { evaluateFormula } from "./src/logic/formula.ts";
       export { PRESETS } from "./src/logic/presets.ts";
       export { simplifyPos, simplifySop } from "./src/logic/simplify.ts";
@@ -22,7 +23,8 @@ const bundle = await build({
 
 const source = bundle.outputFiles[0].text;
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
-const { evaluateFormula, PRESETS, simplifyPos, simplifySop } = await import(moduleUrl);
+const { buildCmosPlan, evaluateFormula, PRESETS, simplifyPos, simplifySop } =
+  await import(moduleUrl);
 
 const DEFAULT_LABELS = {
   A: "A",
@@ -188,10 +190,74 @@ verifyFormula({
   name: "complex mixed custom-name formula"
 });
 
+const redundantAnd = evaluateFormula("F = A'B + AB", 2, DEFAULT_LABELS);
+assert.equal(
+  simplifySop(redundantAnd.variableCount, redundantAnd.values).expression,
+  "B",
+  "F = A'B + AB simplifies to B"
+);
+
+const majority = evaluateFormula("F = AB + AC + BC", 3, DEFAULT_LABELS);
+assert.deepEqual(
+  evaluateSop(3, simplifySop(majority.variableCount, majority.values).terms),
+  majority.values,
+  "majority simplification remains equivalent"
+);
+
+verifyFormula({
+  expectedLabels: { A: "A", B: "B", C: "S" },
+  expectedValues: expectedValues(3, ([a, b, s]) => (!s && a) || (s && b)),
+  expectedVariableCount: 3,
+  formula: "F = S'A + SB",
+  name: "2:1 mux formula with selector S"
+});
+
+const mintermFormula = evaluateFormula(
+  "F(A,B,C,D) = Σm(1,3,7,11,15) d(0,2)",
+  4,
+  DEFAULT_LABELS
+);
+assert.equal(mintermFormula.variableCount, 4, "explicit minterm header count");
+assert.equal(mintermFormula.values[1], "1", "minterm 1 is set");
+assert.equal(mintermFormula.values[3], "1", "minterm 3 is set");
+assert.equal(mintermFormula.values[7], "1", "minterm 7 is set");
+assert.equal(mintermFormula.values[11], "1", "minterm 11 is set");
+assert.equal(mintermFormula.values[15], "1", "minterm 15 is set");
+assert.equal(mintermFormula.values[0], "X", "don't-care 0 is set");
+assert.equal(mintermFormula.values[2], "X", "don't-care 2 is set");
+
+const compactMinterms = evaluateFormula("Σm(1,3,7)", 3, DEFAULT_LABELS);
+assert.deepEqual(
+  compactMinterms.values,
+  expectedValues(3, ([a, b, c]) => (!a && c) || (b && c)),
+  "Σm(1,3,7) generates the expected truth table"
+);
+
+const nandCore = simplifySop(
+  2,
+  evaluateFormula("A and B", 2, DEFAULT_LABELS).values
+);
+const nandPlan = buildCmosPlan(nandCore);
+assert.equal(nandPlan.coreGateName, "NAND2", "AND core maps to NAND2 CMOS");
+assert.equal(nandPlan.pullDown?.type, "series", "NAND2 NMOS is series");
+assert.equal(nandPlan.pullUp?.type, "parallel", "NAND2 PMOS is parallel");
+
+const norCore = simplifySop(
+  2,
+  evaluateFormula("A or B", 2, DEFAULT_LABELS).values
+);
+const norPlan = buildCmosPlan(norCore);
+assert.equal(norPlan.coreGateName, "NOR2", "OR core maps to NOR2 CMOS");
+assert.equal(norPlan.pullDown?.type, "parallel", "NOR2 NMOS is parallel");
+assert.equal(norPlan.pullUp?.type, "series", "NOR2 PMOS is series");
+
 for (const preset of PRESETS) {
   verifyFormula({
     currentVariableCount: preset.variableCount,
-    expectedLabels: labelsForCount(preset.variableCount),
+    expectedLabels:
+      preset.id === "mux-2-1"
+        ? { A: "S", B: "A", C: "B" }
+        : labelsForCount(preset.variableCount),
     expectedValues: preset.makeValues(),
     expectedVariableCount: preset.variableCount,
     formula: preset.formula,

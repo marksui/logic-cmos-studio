@@ -66,6 +66,7 @@ export interface SimplificationResult {
   verilogExpression: string;
   verilogAssign: string;
   terms: ProductTerm[];
+  essentialPrimeImplicants: ProductTerm[];
   minterms: number[];
   dontCares: number[];
   kmap: KMapData;

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CMOSPanel } from "./components/CMOSPanel";
 import { GateDiagram, type GateWireStyle } from "./components/GateDiagram";
 import { KMapPanel } from "./components/KMapPanel";
@@ -8,6 +8,7 @@ import { UniversalGatesPanel } from "./components/UniversalGatesPanel";
 import { buildCmosPlan } from "./logic/cmos";
 import { evaluateFormula } from "./logic/formula";
 import { getVariables, makeTruthRows } from "./logic/kmap";
+import { estimateLogicMetrics } from "./logic/metrics";
 import { PRESET_CATEGORIES, PRESETS, type Preset } from "./logic/presets";
 import { APP_VERSION } from "./version";
 import {
@@ -23,6 +24,7 @@ import type {
   OutputValue,
   PosSimplificationResult,
   ProductLiteral,
+  ProductTerm,
   SimplificationResult,
   VariableCount
 } from "./logic/types";
@@ -53,7 +55,8 @@ const FORMULA_EXAMPLES = [
   "A xnor B",
   "A nand B",
   "A nor B",
-  "SA + SB"
+  "SA + SB",
+  "F(A,B,C) = Σm(1,3,7)"
 ];
 const GUIDE_EXAMPLES = [
   {
@@ -75,6 +78,11 @@ const GUIDE_EXAMPLES = [
     label: "OAI21",
     formula: "not ((A or B) and C)",
     note: "OR-AND-Invert complex CMOS form."
+  },
+  {
+    label: "Minterms",
+    formula: "F(A,B,C,D) = Σm(1,3,7,11,15) d(0,2)",
+    note: "Truth-vector input with optional don't-care terms."
   },
   {
     label: "AOI22",
@@ -138,6 +146,11 @@ const GUIDE_RULES = [
   },
   {
     label: "3",
+    title: "Minterms are accepted",
+    text: "Use F(A,B,C,D) = Σm(1,3,7) d(0,2) when you want truth-table input."
+  },
+  {
+    label: "4",
     title: "Review everything",
     text: "Open Review when you want every supported gate, symbol, and truth table in one page."
   }
@@ -184,7 +197,9 @@ export default function App() {
   const [rawValues, setRawValues] = useState<OutputValue[]>(
     DEFAULT_PRESET.makeValues()
   );
-  const [formulaInput, setFormulaInput] = useState(DEFAULT_PRESET.formula);
+  const [formulaInput, setFormulaInput] = useState(() =>
+    getInitialFormulaInput(DEFAULT_PRESET.formula)
+  );
   const [formulaError, setFormulaError] = useState("");
   const [presetsOpen, setPresetsOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -199,6 +214,9 @@ export default function App() {
   const [gateWireStyle, setGateWireStyle] = useState<GateWireStyle>("straight");
   const [includeOutputInverter, setIncludeOutputInverter] = useState(false);
   const [copyState, setCopyState] = useState<CopyState>("idle");
+  const [expressionCopyState, setExpressionCopyState] =
+    useState<CopyState>("idle");
+  const [shareCopyState, setShareCopyState] = useState<CopyState>("idle");
 
   const values = useMemo(
     () => normalizeValues(variableCount, rawValues),
@@ -241,18 +259,23 @@ export default function App() {
     () => formatPosExpression(posResult, displayLabels),
     [displayLabels, posResult]
   );
-  const verilogBundle = useMemo(
+  const logicMetrics = useMemo(
     () =>
-      [
-        replaceVerilogVariables(result.verilogAssign, displayLabels),
-        `assign F_pos = ${replaceVerilogVariables(
-          posResult.verilogExpression,
-          displayLabels
-        )};`,
-        replaceVerilogVariables(gateConversions.nand.verilogAssign, displayLabels),
-        replaceVerilogVariables(gateConversions.nor.verilogAssign, displayLabels)
-      ].join("\n"),
-    [displayLabels, gateConversions, posResult.verilogExpression, result.verilogAssign]
+      estimateLogicMetrics({
+        cmosTransistorCount: cmosPlan.transistorCount,
+        formula: formulaInput,
+        result,
+        variableCount
+      }),
+    [cmosPlan.transistorCount, formulaInput, result, variableCount]
+  );
+  const verilogBundle = useMemo(
+    () => buildVerilogModule(result, displayLabels),
+    [displayLabels, result]
+  );
+  const simplifiedExpressionText = useMemo(
+    () => `F = ${displaySopExpression}`,
+    [displaySopExpression]
   );
   const showLogicMiddleRow = logicPanels.kmap || logicPanels.forms || logicPanels.verilog;
   const showLogicSideColumn = logicPanels.forms || logicPanels.verilog;
@@ -262,6 +285,17 @@ export default function App() {
     logicPanels.universal ||
     logicPanels.truth;
   const hasCmosContent = Object.values(cmosPanels).some(Boolean);
+
+  useEffect(() => {
+    const expression = getUrlExpression();
+    if (expression) {
+      applyFormulaText(expression, {
+        currentVariableCount: DEFAULT_PRESET.variableCount,
+        labels: DEFAULT_INPUT_LABELS,
+        syncUrl: false
+      });
+    }
+  }, []);
 
   function toggleLogicPanel(panel: LogicPanelId) {
     setLogicPanels((current) => ({ ...current, [panel]: !current[panel] }));
@@ -309,73 +343,77 @@ export default function App() {
     setPresetsOpen(false);
   }
 
-  function applyPreset(preset: Preset) {
+  function applyFormulaText(
+    nextFormula: string,
+    options: {
+      currentVariableCount?: VariableCount;
+      labels?: Partial<Record<LogicVariable, string>>;
+      syncUrl?: boolean;
+    } = {}
+  ) {
     try {
       const evaluation = evaluateFormula(
-        preset.formula,
-        preset.variableCount,
-        DEFAULT_INPUT_LABELS
+        nextFormula,
+        options.currentVariableCount ?? variableCount,
+        options.labels ?? displayLabels
       );
       setVariableCount(evaluation.variableCount);
       setInputLabels(evaluation.variableLabels);
       setRawValues(evaluation.values);
-      setFormulaInput(preset.formula);
+      setFormulaInput(nextFormula);
       setFormulaError("");
       setPresetsOpen(false);
+      if (options.syncUrl !== false) {
+        syncExpressionToUrl(nextFormula);
+      }
     } catch (error) {
-      setFormulaInput(preset.formula);
+      setFormulaInput(nextFormula);
       setFormulaError(
-        error instanceof Error ? error.message : "Could not parse the preset."
+        error instanceof Error ? error.message : "Could not parse the formula."
       );
     }
+  }
+
+  function applyPreset(preset: Preset) {
+    applyFormulaText(preset.formula, {
+      currentVariableCount: preset.variableCount,
+      labels: DEFAULT_INPUT_LABELS
+    });
   }
 
   function applyFormula() {
-    try {
-      const evaluation = evaluateFormula(formulaInput, variableCount, displayLabels);
-      setVariableCount(evaluation.variableCount);
-      setInputLabels(evaluation.variableLabels);
-      setRawValues(evaluation.values);
-      setFormulaError("");
-      setPresetsOpen(false);
-    } catch (error) {
-      setFormulaError(
-        error instanceof Error ? error.message : "Could not parse the formula."
-      );
-    }
+    applyFormulaText(formulaInput);
   }
 
   function useGuideFormula(formula: string) {
-    try {
-      const evaluation = evaluateFormula(
-        formula,
-        variableCount,
-        DEFAULT_INPUT_LABELS
-      );
-      setVariableCount(evaluation.variableCount);
-      setInputLabels(evaluation.variableLabels);
-      setRawValues(evaluation.values);
-      setFormulaInput(formula);
-      setFormulaError("");
-    } catch (error) {
-      setFormulaInput(formula);
-      setFormulaError(
-        error instanceof Error ? error.message : "Could not parse the formula."
-      );
-    }
-
+    applyFormulaText(formula, { labels: DEFAULT_INPUT_LABELS });
     setGuideOpen(false);
     setPresetsOpen(false);
   }
 
   async function copyVerilog() {
+    await copyText(verilogBundle, setCopyState);
+  }
+
+  async function copySimplifiedExpression() {
+    await copyText(simplifiedExpressionText, setExpressionCopyState);
+  }
+
+  async function copyShareUrl() {
+    await copyText(buildShareUrl(formulaInput), setShareCopyState);
+  }
+
+  async function copyText(
+    value: string,
+    setState: (state: CopyState) => void
+  ) {
     try {
-      await navigator.clipboard.writeText(verilogBundle);
-      setCopyState("copied");
+      await navigator.clipboard.writeText(value);
+      setState("copied");
     } catch {
-      setCopyState("failed");
+      setState("failed");
     }
-    window.setTimeout(() => setCopyState("idle"), 1400);
+    window.setTimeout(() => setState("idle"), 1400);
   }
 
   return (
@@ -432,6 +470,17 @@ export default function App() {
                 className="control-button py-1.5 text-xs"
               >
                 Guide
+              </button>
+              <button
+                type="button"
+                onClick={copyShareUrl}
+                className="control-button py-1.5 text-xs"
+              >
+                {shareCopyState === "copied"
+                  ? "URL copied"
+                  : shareCopyState === "failed"
+                    ? "Copy failed"
+                    : "Share"}
               </button>
               <button
                 type="button"
@@ -596,7 +645,7 @@ export default function App() {
                 className={`w-full rounded-md border bg-white px-3 py-2.5 font-mono text-sm text-slate-800 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-sky-500/20 ${
                   formulaError ? "border-rose-300" : "border-slate-200"
                 }`}
-                placeholder="A'B + AC"
+                placeholder="F = A'B + AC or F(A,B,C)=Σm(1,3,7)"
                 aria-label="Boolean formula"
                 aria-invalid={Boolean(formulaError)}
               />
@@ -695,11 +744,24 @@ export default function App() {
                   <div className="grid min-w-0 gap-5">
                     {logicPanels.forms && (
                       <section className="surface-card p-4">
-                        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-                          SOP / POS Forms
-                        </h2>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+                            SOP / POS Forms
+                          </h2>
+                          <button
+                            type="button"
+                            onClick={copySimplifiedExpression}
+                            className="control-button py-1.5 text-xs"
+                          >
+                            {expressionCopyState === "copied"
+                              ? "Copied"
+                              : expressionCopyState === "failed"
+                                ? "Copy failed"
+                                : "Copy SOP"}
+                          </button>
+                        </div>
                         <div className="mt-4 grid gap-3">
-                          <ExpressionBlock label="Minimized SOP" value={`F = ${displaySopExpression}`} />
+                          <ExpressionBlock label="Minimized SOP" value={simplifiedExpressionText} />
                           <ExpressionBlock label="Minimized POS" value={`F = ${displayPosExpression}`} />
                         </div>
                         <div className="mt-4 grid gap-2 text-sm text-slate-600">
@@ -722,6 +784,50 @@ export default function App() {
                                 .join(" ") || "none"
                             }
                           />
+                          <Metric
+                            label="Essential prime implicants"
+                            value={formatEssentialPrimeImplicants(
+                              result.essentialPrimeImplicants,
+                              displayLabels
+                            )}
+                          />
+                        </div>
+                        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              Educational Estimates
+                            </h3>
+                            <span className="rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-slate-500">
+                              approximate
+                            </span>
+                          </div>
+                          <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
+                            <Metric
+                              label="Original literals"
+                              value={`${logicMetrics.originalLiteralCount}`}
+                            />
+                            <Metric
+                              label="Simplified literals"
+                              value={`${logicMetrics.simplifiedLiteralCount}`}
+                            />
+                            <Metric
+                              label="Gate count"
+                              value={`${logicMetrics.estimatedGateCount}`}
+                            />
+                            <Metric
+                              label="Logic depth"
+                              value={`${logicMetrics.estimatedLogicDepth}`}
+                            />
+                            <Metric
+                              label="CMOS transistors"
+                              value={`${logicMetrics.estimatedTransistorCount}`}
+                            />
+                          </div>
+                          <p className="mt-3 text-xs leading-5 text-slate-500">
+                            Estimates assume a simple SOP implementation plus
+                            static CMOS transistor counts from the schematic
+                            model.
+                          </p>
                         </div>
                       </section>
                     )}
@@ -1212,6 +1318,34 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function buildVerilogModule(
+  result: SimplificationResult,
+  labels: Record<LogicVariable, string>
+): string {
+  const usedVariables = getUsedVariables(result);
+  const ports = [
+    ...usedVariables.map((variable) => `    input ${labels[variable]},`),
+    "    output F"
+  ];
+
+  return [
+    "module logic_func (",
+    ports.join("\n"),
+    ");",
+    `    assign F = ${replaceVerilogVariables(result.verilogExpression, labels)};`,
+    "endmodule"
+  ].join("\n");
+}
+
+function getUsedVariables(result: SimplificationResult): LogicVariable[] {
+  const used = new Set<LogicVariable>();
+  result.terms.forEach((term) => {
+    term.literals.forEach((literal) => used.add(literal.variable));
+  });
+
+  return ALL_VARIABLES.filter((variable) => used.has(variable));
+}
+
 function ExpressionBlock({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -1231,6 +1365,16 @@ function formatSet(values: number[]): string {
 
 function formatMaxterms(values: number[]): string {
   return values.length > 0 ? `M(${values.join(", ")})` : "none";
+}
+
+function formatEssentialPrimeImplicants(
+  terms: ProductTerm[],
+  labels: Record<LogicVariable, string>
+): string {
+  return (
+    terms.map((term) => formatProductTerm(term.literals, labels)).join(", ") ||
+    "none"
+  );
 }
 
 function sanitizeVariableLabel(value: string): string {
@@ -1314,4 +1458,31 @@ function normalizeInputLabels(
       sanitizeVariableLabel(labels[variable]) || variable
     ])
   ) as Record<LogicVariable, string>;
+}
+
+function getInitialFormulaInput(fallback: string): string {
+  return getUrlExpression() ?? fallback;
+}
+
+function getUrlExpression(): string | null {
+  if (typeof window === "undefined") return null;
+
+  const expression = new URLSearchParams(window.location.search).get("expr");
+  return expression?.trim() || null;
+}
+
+function syncExpressionToUrl(expression: string) {
+  if (typeof window === "undefined") return;
+
+  const url = new URL(window.location.href);
+  url.searchParams.set("expr", expression);
+  window.history.replaceState(null, "", url);
+}
+
+function buildShareUrl(expression: string): string {
+  if (typeof window === "undefined") return `?expr=${encodeURIComponent(expression)}`;
+
+  const url = new URL(window.location.href);
+  url.searchParams.set("expr", expression);
+  return url.toString();
 }

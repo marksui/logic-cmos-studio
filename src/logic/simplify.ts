@@ -53,6 +53,7 @@ export function simplifySop(
       verilogExpression: "1'b0",
       verilogAssign: "assign F = 1'b0;",
       terms: [],
+      essentialPrimeImplicants: [],
       minterms,
       dontCares,
       kmap
@@ -64,6 +65,12 @@ export function simplifySop(
   const terms = selected
     .map(candidateToProductTerm)
     .sort((left, right) => left.expression.localeCompare(right.expression));
+  const essentialPrimeImplicants = findEssentialPrimeGroups(
+    candidates,
+    new Set(minterms)
+  )
+    .map(candidateToProductTerm)
+    .sort((left, right) => left.expression.localeCompare(right.expression));
   const expression = terms.map((term) => term.expression).join(" + ");
   const verilogExpression = terms.map((term) => parenthesizeTerm(term.verilog)).join(" | ");
 
@@ -72,6 +79,7 @@ export function simplifySop(
     verilogExpression,
     verilogAssign: `assign F = ${verilogExpression};`,
     terms,
+    essentialPrimeImplicants,
     minterms,
     dontCares,
     kmap
@@ -262,6 +270,25 @@ function chooseMinimumCover(
 
   search([], targetMinterms);
   return best ?? [];
+}
+
+function findEssentialPrimeGroups(
+  candidates: CandidateGroup[],
+  targetMinterms: Set<number>
+): CandidateGroup[] {
+  const essential = new Map<string, CandidateGroup>();
+
+  for (const minterm of targetMinterms) {
+    const covering = candidates.filter((candidate) =>
+      candidate.coveredMinterms.has(minterm)
+    );
+
+    if (covering.length === 1) {
+      essential.set(covering[0].id, covering[0]);
+    }
+  }
+
+  return [...essential.values()];
 }
 
 function deriveLiterals(

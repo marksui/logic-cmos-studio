@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { CmosNetworkNode, CmosPlan, TransistorKind } from "../logic/cmos";
 import { CMOSSchematic, type CmosSymbolStyle } from "./CMOSSchematic";
 import { SizingPanel } from "./SizingPanel";
@@ -30,9 +30,24 @@ export function CMOSPanel({
 }: CMOSPanelProps) {
   const [styleOpen, setStyleOpen] = useState(false);
   const [symbolStyle, setSymbolStyle] = useState<CmosSymbolStyle>("textbook");
+  const panelRef = useRef<HTMLElement | null>(null);
+
+  function exportSchematicSvg() {
+    const svg = panelRef.current?.querySelector("svg");
+    if (!svg) return;
+
+    const source = new XMLSerializer().serializeToString(svg);
+    const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `logic-cmos-${plan.coreGateName.toLowerCase().replace(/\s+/g, "-")}.svg`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
-    <section className="surface-card p-4">
+    <section ref={panelRef} className="surface-card p-4">
       <div className="relative flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
           Static CMOS Schematic
@@ -61,14 +76,23 @@ export function CMOSPanel({
             </div>
           )}
           {visibleSections.schematic && (
-            <button
-              type="button"
-              onClick={() => setStyleOpen((open) => !open)}
-              className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
-              aria-expanded={styleOpen}
-            >
-              Style
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={exportSchematicSvg}
+                className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
+              >
+                Export SVG
+              </button>
+              <button
+                type="button"
+                onClick={() => setStyleOpen((open) => !open)}
+                className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
+                aria-expanded={styleOpen}
+              >
+                Style
+              </button>
+            </>
           )}
         </div>
         {visibleSections.schematic && styleOpen && (
@@ -126,6 +150,14 @@ export function CMOSPanel({
                 : "none"
             }
           />
+          <div className="rounded-md border border-sky-100 bg-sky-50 px-3 py-2 lg:col-span-2">
+            <span className="block text-xs font-semibold uppercase tracking-wide text-sky-700">
+              Teaching note
+            </span>
+            <p className="mt-1 text-sm leading-6 text-sky-900">
+              {cmosTeachingExplanation(plan)}
+            </p>
+          </div>
         </div>
       )}
 
@@ -168,6 +200,30 @@ export function CMOSPanel({
       )}
     </section>
   );
+}
+
+function cmosTeachingExplanation(plan: CmosPlan): string {
+  if (plan.coreGateName.startsWith("NAND")) {
+    return "For NAND, the NMOS pull-down network is series because the output should discharge only when every input is 1. The PMOS pull-up network is parallel because any 0 input can charge the output back to VDD.";
+  }
+
+  if (plan.coreGateName.startsWith("NOR")) {
+    return "For NOR, the NMOS pull-down network is parallel because any 1 input can discharge the output. The PMOS pull-up network is series because the output charges only when every input is 0.";
+  }
+
+  if (plan.coreGateName.startsWith("AOI")) {
+    return "AOI gates build an AND-OR core and use the static CMOS dual network to create the inverted output directly, which often saves transistors compared with separate AND, OR, and NOT stages.";
+  }
+
+  if (plan.coreGateName.startsWith("OAI")) {
+    return "OAI gates build an OR-AND core and invert it at the CMOS output. The NMOS network follows the pull-down logic, while the PMOS network is the complementary dual.";
+  }
+
+  if (plan.coreGateName.startsWith("INV")) {
+    return "An inverter uses one PMOS device to pull the output up when the input is 0 and one NMOS device to pull the output down when the input is 1.";
+  }
+
+  return "This schematic is a teaching-level static CMOS network generated from the simplified logic. Series devices model conditions that must all be true; parallel devices model alternate conducting paths.";
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

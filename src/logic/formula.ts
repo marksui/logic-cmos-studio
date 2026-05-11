@@ -26,6 +26,19 @@ interface FormulaEvaluation {
   values: OutputValue[];
 }
 
+type FormulaInput =
+  | {
+      kind: "expression";
+      expression: string;
+      explicitVariableLabels: string[] | null;
+    }
+  | {
+      kind: "minterms";
+      dontCares: number[];
+      minterms: number[];
+      explicitVariableLabels: string[] | null;
+    };
+
 const LOGIC_VARIABLES: readonly LogicVariable[] = ALL_VARIABLES;
 const RESERVED_WORDS = new Set([
   "AND",
@@ -48,11 +61,24 @@ export function evaluateFormula(
   _currentVariableCount: VariableCount,
   variableLabels: FormulaVariableLabels = {}
 ): FormulaEvaluation {
-  const variableResolver = new VariableResolver(variableLabels);
-  const tokens = addImplicitAnds(tokenize(formula, variableResolver));
+  const input = normalizeFormulaInput(formula);
+
+  if (input.kind === "minterms") {
+    return evaluateMintermInput(input);
+  }
+
+  const variableResolver = new VariableResolver(variableLabels, {
+    explicitVariableLabels: input.explicitVariableLabels,
+    protectedVariables: input.explicitVariableLabels
+      ? undefined
+      : collectProtectedBuiltIns(input.expression)
+  });
+  const tokens = addImplicitAnds(tokenize(input.expression, variableResolver));
   const parser = new FormulaParser(tokens);
   const ast = parser.parse();
-  const variableCount = pickVariableCount(ast);
+  const variableCount = input.explicitVariableLabels
+    ? validateVariableCount(input.explicitVariableLabels.length)
+    : pickVariableCount(ast);
   const values = Array.from({ length: 1 << variableCount }, (_, minterm) => {
     const bits = mintermToBits(minterm, variableCount);
     const context = new Map<LogicVariable, boolean>();
@@ -73,6 +99,157 @@ export function evaluateFormula(
   };
 }
 
+function normalizeFormulaInput(formula: string): FormulaInput {
+  const trimmed = formula.trim();
+  const assignmentIndex = trimmed.indexOf("=");
+  const lhs = assignmentIndex >= 0 ? trimmed.slice(0, assignmentIndex).trim() : "";
+  const rhs = assignmentIndex >= 0 ? trimmed.slice(assignmentIndex + 1).trim() : trimmed;
+  const explicitVariableLabels = parseFunctionHeader(lhs);
+  const mintermInput = parseMintermInput(rhs, explicitVariableLabels);
+
+  if (mintermInput) {
+    return mintermInput;
+  }
+
+  return {
+    kind: "expression",
+    expression: rhs,
+    explicitVariableLabels
+  };
+}
+
+function parseFunctionHeader(lhs: string): string[] | null {
+  if (!lhs) return null;
+
+  const match = lhs.match(/^[A-Za-z][A-Za-z0-9_]*\s*(?:\(([^)]*)\))?$/);
+  if (!match) {
+    throw new Error("Use a header like F = ... or F(A,B,C,D) = ...");
+  }
+
+  if (!match[1]) return null;
+
+  const labels = match[1]
+    .split(",")
+    .map((label) => sanitizeAutoVariableLabel(label))
+    .filter(Boolean);
+
+  if (labels.length === 0) {
+    throw new Error("Function headers need at least one variable.");
+  }
+
+  return labels;
+}
+
+function parseMintermInput(
+  expression: string,
+  explicitVariableLabels: string[] | null
+): Extract<FormulaInput, { kind: "minterms" }> | null {
+  const mintermMatch = expression.match(/(?:\u03a3|sigma|sum)?\s*m\s*\(([^)]*)\)/i);
+  if (!mintermMatch) {
+    return null;
+  }
+
+  const dontCareMatch = expression.match(/(?:d|dc|x)\s*\(([^)]*)\)/i);
+
+  return {
+    kind: "minterms",
+    minterms: parseTermIndexes(mintermMatch[1], "minterm"),
+    dontCares: dontCareMatch ? parseTermIndexes(dontCareMatch[1], "don't-care") : [],
+    explicitVariableLabels
+  };
+}
+
+function parseTermIndexes(source: string, label: string): number[] {
+  if (!source.trim()) return [];
+
+  const indexes = source
+    .split(/[,\s]+/)
+    .filter(Boolean)
+    .flatMap((part) => {
+      const range = part.match(/^(\d+)-(\d+)$/);
+      if (!range) {
+        const value = Number(part);
+        if (!Number.isInteger(value) || value < 0) {
+          throw new Error(`Invalid ${label} index "${part}".`);
+        }
+        return [value];
+      }
+
+      const start = Number(range[1]);
+      const end = Number(range[2]);
+      if (end < start) {
+        throw new Error(`Invalid ${label} range "${part}".`);
+      }
+
+      return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+    });
+
+  return [...new Set(indexes)].sort((left, right) => left - right);
+}
+
+function evaluateMintermInput(
+  input: Extract<FormulaInput, { kind: "minterms" }>
+): FormulaEvaluation {
+  const highestIndex = Math.max(0, ...input.minterms, ...input.dontCares);
+  const inferredVariableCount = Math.max(
+    MIN_VARIABLE_COUNT,
+    Math.ceil(Math.log2(highestIndex + 1))
+  );
+  const variableCount = validateVariableCount(
+    input.explicitVariableLabels?.length ?? inferredVariableCount
+  );
+  const rowCount = 1 << variableCount;
+  const values: OutputValue[] = Array.from({ length: rowCount }, () => "0");
+
+  for (const index of input.dontCares) {
+    validateTermIndex(index, rowCount, "don't-care");
+    values[index] = "X";
+  }
+
+  for (const index of input.minterms) {
+    validateTermIndex(index, rowCount, "minterm");
+    values[index] = "1";
+  }
+
+  return {
+    variableCount,
+    variableLabels: labelsFromExplicitHeader(input.explicitVariableLabels),
+    values
+  };
+}
+
+function labelsFromExplicitHeader(
+  explicitVariableLabels: string[] | null
+): Record<LogicVariable, string> {
+  const labels = Object.fromEntries(
+    LOGIC_VARIABLES.map((variable) => [variable, variable])
+  ) as Record<LogicVariable, string>;
+
+  explicitVariableLabels?.forEach((label, index) => {
+    labels[LOGIC_VARIABLES[index]] = label;
+  });
+
+  return labels;
+}
+
+function validateVariableCount(count: number): VariableCount {
+  if (count < MIN_VARIABLE_COUNT || count > MAX_VARIABLE_COUNT) {
+    throw new Error(
+      `This workspace supports ${MIN_VARIABLE_COUNT} to ${MAX_VARIABLE_COUNT} variables.`
+    );
+  }
+
+  return count as VariableCount;
+}
+
+function validateTermIndex(index: number, rowCount: number, label: string) {
+  if (index >= rowCount) {
+    throw new Error(
+      `${label} index ${index} does not fit in ${Math.log2(rowCount)} variables.`
+    );
+  }
+}
+
 function normalizeVariableAlias(value: string | undefined): string {
   return (value ?? "").trim().replace(/\s+/g, "").toUpperCase();
 }
@@ -84,8 +261,36 @@ class VariableResolver {
     LOGIC_VARIABLES.map((variable) => [variable, variable])
   ) as Record<LogicVariable, string>;
   private readonly usedVariables = new Set<LogicVariable>();
+  private readonly explicitVariableCount: number | null;
+  private readonly protectedVariables: Set<LogicVariable>;
 
-  constructor(variableLabels: FormulaVariableLabels) {
+  constructor(
+    variableLabels: FormulaVariableLabels,
+    options: {
+      explicitVariableLabels?: string[] | null;
+      protectedVariables?: Set<LogicVariable>;
+    } = {}
+  ) {
+    this.explicitVariableCount = options.explicitVariableLabels?.length ?? null;
+    this.protectedVariables = options.protectedVariables ?? new Set();
+
+    if (options.explicitVariableLabels) {
+      options.explicitVariableLabels.forEach((rawLabel, index) => {
+        const variable = LOGIC_VARIABLES[index];
+        const label = sanitizeAutoVariableLabel(rawLabel) || variable;
+        const alias = normalizeVariableAlias(label);
+        const existing = this.aliases.get(alias);
+
+        if (existing && existing !== variable) {
+          throw new Error("Variable names in the function header must be unique.");
+        }
+
+        this.labels[variable] = label;
+        this.aliases.set(alias, variable);
+      });
+      return;
+    }
+
     LOGIC_VARIABLES.forEach((variable) => this.aliases.set(variable, variable));
 
     for (const variable of LOGIC_VARIABLES) {
@@ -122,7 +327,16 @@ class VariableResolver {
     return variable;
   }
 
+  hasAlias(word: string): boolean {
+    const alias = normalizeVariableAlias(word);
+    return this.aliases.has(alias) || this.dynamicAliases.has(alias);
+  }
+
   resolveDynamic(word: string): LogicVariable {
+    if (this.explicitVariableCount !== null) {
+      throw new Error(`"${word}" is not listed in the function header.`);
+    }
+
     const alias = normalizeVariableAlias(word);
     const existing = this.dynamicAliases.get(alias);
 
@@ -131,9 +345,13 @@ class VariableResolver {
       return existing;
     }
 
-    const nextVariable = LOGIC_VARIABLES.find(
-      (variable) => !this.usedVariables.has(variable)
-    );
+    const nextVariable =
+      LOGIC_VARIABLES.find(
+        (variable) =>
+          !this.usedVariables.has(variable) &&
+          !this.protectedVariables.has(variable)
+      ) ??
+      LOGIC_VARIABLES.find((variable) => !this.usedVariables.has(variable));
 
     if (!nextVariable) {
       throw new Error(`This workspace supports up to ${MAX_VARIABLE_COUNT} variables.`);
@@ -280,7 +498,7 @@ function tokenize(
         tokens.push({ type: "const", value: false });
       } else if (existingVariable) {
         tokens.push({ type: "var", value: existingVariable });
-      } else if (shouldSplitImplicitVariables(rawWord)) {
+      } else if (shouldSplitImplicitVariables(rawWord, variableResolver)) {
         for (const variableName of rawWord) {
           tokens.push({
             type: "var",
@@ -310,10 +528,62 @@ function tokenize(
   return tokens;
 }
 
-function shouldSplitImplicitVariables(word: string): boolean {
+function collectProtectedBuiltIns(expression: string): Set<LogicVariable> {
+  const protectedVariables = new Set<LogicVariable>();
+  const words = expression.match(/[A-Za-z][A-Za-z0-9_]*/g) ?? [];
+  const singleCustomWords = new Set(
+    words
+      .map((word) => word.toUpperCase())
+      .filter(
+        (word) =>
+          word.length === 1 &&
+          !RESERVED_WORDS.has(word) &&
+          !LOGIC_VARIABLES.includes(word as LogicVariable)
+      )
+  );
+
+  for (const word of words) {
+    const upperWord = word.toUpperCase();
+    if (RESERVED_WORDS.has(upperWord)) continue;
+
+    if (word.length === 1 && LOGIC_VARIABLES.includes(upperWord as LogicVariable)) {
+      protectedVariables.add(upperWord as LogicVariable);
+      continue;
+    }
+
+    if (
+      word.length > 1 &&
+      [...upperWord].every((char) => LOGIC_VARIABLES.includes(char as LogicVariable))
+    ) {
+      [...upperWord].forEach((char) =>
+        protectedVariables.add(char as LogicVariable)
+      );
+      continue;
+    }
+
+    if (
+      word.length > 1 &&
+      singleCustomWords.has(upperWord[0]) &&
+      [...upperWord.slice(1)].every((char) =>
+        LOGIC_VARIABLES.includes(char as LogicVariable)
+      )
+    ) {
+      [...upperWord.slice(1)].forEach((char) =>
+        protectedVariables.add(char as LogicVariable)
+      );
+    }
+  }
+
+  return protectedVariables;
+}
+
+function shouldSplitImplicitVariables(
+  word: string,
+  variableResolver: VariableResolver
+): boolean {
   return (
     word.length > 1 &&
-    [...word].every((char) => LOGIC_VARIABLES.includes(char as LogicVariable))
+    [...word].every((char) => variableResolver.hasAlias(char))
   );
 }
 

@@ -29,6 +29,32 @@ function valuesFromPredicate(
 export const PRESETS: Preset[] = [
   {
     category: "Basic gates",
+    id: "not",
+    name: "NOT",
+    formula: "not A",
+    variableCount: 2,
+    makeValues: () => valuesFromPredicate(2, ([a]) => a !== 1)
+  },
+  {
+    category: "Basic gates",
+    id: "and",
+    name: "AND2",
+    formula: "A and B",
+    variableCount: 2,
+    makeValues: () =>
+      valuesFromPredicate(2, ([a, b]) => a === 1 && b === 1)
+  },
+  {
+    category: "Basic gates",
+    id: "or",
+    name: "OR2",
+    formula: "A or B",
+    variableCount: 2,
+    makeValues: () =>
+      valuesFromPredicate(2, ([a, b]) => a === 1 || b === 1)
+  },
+  {
+    category: "Basic gates",
     id: "xor",
     name: "XOR",
     formula: "A xor B",
@@ -48,7 +74,7 @@ export const PRESETS: Preset[] = [
   {
     category: "Basic gates",
     id: "nand",
-    name: "NAND",
+    name: "NAND2",
     formula: "A nand B",
     variableCount: 2,
     makeValues: () =>
@@ -57,7 +83,7 @@ export const PRESETS: Preset[] = [
   {
     category: "Basic gates",
     id: "nor",
-    name: "NOR",
+    name: "NOR2",
     formula: "A nor B",
     variableCount: 2,
     makeValues: () =>
@@ -107,6 +133,15 @@ export const PRESETS: Preset[] = [
   },
   {
     category: "Arithmetic",
+    id: "mux-2-1",
+    name: "2:1 MUX",
+    formula: "F(S,A,B) = S'A + SB",
+    variableCount: 3,
+    makeValues: () =>
+      valuesFromPredicate(3, ([s, a, b]) => (s === 1 ? b === 1 : a === 1))
+  },
+  {
+    category: "Arithmetic",
     id: "majority",
     name: "Majority",
     formula: "AB + AC + BC",
@@ -116,11 +151,38 @@ export const PRESETS: Preset[] = [
   },
   {
     category: "Arithmetic",
+    id: "half-adder-sum",
+    name: "Half-adder sum",
+    formula: "A xor B",
+    variableCount: 2,
+    makeValues: () =>
+      valuesFromPredicate(2, ([a, b]) => (a === 1) !== (b === 1))
+  },
+  {
+    category: "Arithmetic",
+    id: "half-adder-carry",
+    name: "Half-adder carry",
+    formula: "A and B",
+    variableCount: 2,
+    makeValues: () =>
+      valuesFromPredicate(2, ([a, b]) => a === 1 && b === 1)
+  },
+  {
+    category: "Arithmetic",
     id: "full-adder-sum",
     name: "Full-adder sum",
     formula: "A xor B xor C",
     variableCount: 3,
     makeValues: () =>
       valuesFromPredicate(3, (bits) => bits.filter(Boolean).length % 2 === 1)
+  },
+  {
+    category: "Arithmetic",
+    id: "full-adder-carry",
+    name: "Full-adder carry",
+    formula: "AB + AC + BC",
+    variableCount: 3,
+    makeValues: () =>
+      valuesFromPredicate(3, (bits) => bits.filter(Boolean).length >= 2)
   }
 ];
