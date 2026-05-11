@@ -29,9 +29,50 @@ const VARIABLE_COUNTS: VariableCount[] = [2, 3, 4];
 const DEFAULT_PRESET = PRESETS.find((preset) => preset.id === "majority")!;
 type Workspace = "logic" | "cmos";
 type CopyState = "idle" | "copied" | "failed";
+type LogicPanelId =
+  | "summary"
+  | "diagram"
+  | "kmap"
+  | "forms"
+  | "verilog"
+  | "universal"
+  | "truth";
+type CmosPanelId = "overview" | "networks" | "sizing" | "schematic" | "netlist";
+type PanelVisibility<T extends string> = Record<T, boolean>;
 
-const GITHUB_PAGES_URL = "https://marksui.github.io/logic-cmos-studio/";
 const FORMULA_EXAMPLES = ["A'B + AC", "A xor B", "A xnor B", "A nand B", "A nor B"];
+const DEFAULT_LOGIC_PANELS: PanelVisibility<LogicPanelId> = {
+  diagram: true,
+  forms: true,
+  kmap: true,
+  summary: true,
+  truth: false,
+  universal: false,
+  verilog: false
+};
+const DEFAULT_CMOS_PANELS: PanelVisibility<CmosPanelId> = {
+  netlist: false,
+  networks: false,
+  overview: true,
+  schematic: true,
+  sizing: false
+};
+const LOGIC_PANEL_OPTIONS: { id: LogicPanelId; label: string }[] = [
+  { id: "summary", label: "Summary" },
+  { id: "diagram", label: "Gate diagram" },
+  { id: "kmap", label: "K-map" },
+  { id: "forms", label: "SOP / POS" },
+  { id: "verilog", label: "Verilog" },
+  { id: "universal", label: "Universal gates" },
+  { id: "truth", label: "Truth table" }
+];
+const CMOS_PANEL_OPTIONS: { id: CmosPanelId; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "networks", label: "Pull networks" },
+  { id: "sizing", label: "Sizing" },
+  { id: "schematic", label: "Schematic" },
+  { id: "netlist", label: "Netlist" }
+];
 
 const DEFAULT_INPUT_LABELS: Record<LogicVariable, string> = {
   A: "A",
@@ -50,8 +91,12 @@ export default function App() {
   const [formulaInput, setFormulaInput] = useState(DEFAULT_PRESET.formula);
   const [formulaError, setFormulaError] = useState("");
   const [presetsOpen, setPresetsOpen] = useState(false);
-  const [guideOpen, setGuideOpen] = useState(false);
+  const [displayOpen, setDisplayOpen] = useState(false);
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace>("logic");
+  const [logicPanels, setLogicPanels] =
+    useState<PanelVisibility<LogicPanelId>>(DEFAULT_LOGIC_PANELS);
+  const [cmosPanels, setCmosPanels] =
+    useState<PanelVisibility<CmosPanelId>>(DEFAULT_CMOS_PANELS);
   const [inputLabels, setInputLabels] =
     useState<Record<LogicVariable, string>>(DEFAULT_INPUT_LABELS);
   const [gateWireStyle, setGateWireStyle] = useState<GateWireStyle>("straight");
@@ -113,6 +158,31 @@ export default function App() {
     [displayLabels, gateConversions, posResult.verilogExpression, result.verilogAssign]
   );
   const outputSummary = useMemo(() => countOutputs(values), [values]);
+  const showLogicMiddleRow = logicPanels.kmap || logicPanels.forms || logicPanels.verilog;
+  const showLogicSideColumn = logicPanels.forms || logicPanels.verilog;
+  const hasLogicContent =
+    logicPanels.summary ||
+    logicPanels.diagram ||
+    showLogicMiddleRow ||
+    logicPanels.universal ||
+    logicPanels.truth;
+  const hasCmosContent = Object.values(cmosPanels).some(Boolean);
+
+  function toggleLogicPanel(panel: LogicPanelId) {
+    setLogicPanels((current) => ({ ...current, [panel]: !current[panel] }));
+  }
+
+  function toggleCmosPanel(panel: CmosPanelId) {
+    setCmosPanels((current) => ({ ...current, [panel]: !current[panel] }));
+  }
+
+  function resetDisplay() {
+    if (activeWorkspace === "logic") {
+      setLogicPanels(DEFAULT_LOGIC_PANELS);
+    } else {
+      setCmosPanels(DEFAULT_CMOS_PANELS);
+    }
+  }
 
   function handleVariableCountChange(nextCount: VariableCount) {
     setVariableCount(nextCount);
@@ -179,7 +249,7 @@ export default function App() {
   return (
     <main className="app-shell min-h-screen overflow-x-hidden text-slate-900">
       <header className="border-b border-white/70 bg-white/85 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+        <div className="mx-auto flex max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-slate-950 text-sm font-bold text-white shadow-soft">
               LC
@@ -198,92 +268,38 @@ export default function App() {
               </p>
             </div>
           </div>
-
-          <div className="relative flex flex-wrap items-center gap-2">
-            <a
-              href={GITHUB_PAGES_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="control-button py-1.5 text-xs"
-            >
-              GitHub Pages
-            </a>
-            <button
-              type="button"
-              onClick={() => setGuideOpen((open) => !open)}
-              className="control-button py-1.5 text-xs"
-              aria-expanded={guideOpen}
-            >
-              Guide
-            </button>
-            {guideOpen && (
-              <div className="absolute right-0 top-11 z-30 w-[min(560px,calc(100vw-32px))] rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-soft">
-                <div className="flex items-start justify-between gap-3">
-                  <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-                    Formula Guide
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={() => setGuideOpen(false)}
-                    className="rounded-md px-2 py-1 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
-                  >
-                    Close
-                  </button>
-                </div>
-                <div className="mt-3 grid gap-2 leading-6">
-                  <p>
-                    Try <code>A&apos;B + AC</code>, <code>A xor B</code>,{" "}
-                    <code>A xnor B</code>, <code>A nand B</code>, or{" "}
-                    <code>A nor B</code>.
-                  </p>
-                  <p>
-                    Gate names can be typed as words: <code>A and B</code>,{" "}
-                    <code>A or B</code>, <code>A nand B</code>, <code>A nor B</code>,{" "}
-                    <code>A xor B</code>, and <code>A xnor B</code>. For NOT, use{" "}
-                    <code>~A</code>, <code>not A</code>, or <code>A&apos;</code>.
-                  </p>
-                  <p>
-                    Click output cells in the truth table or K-map to cycle 0, 1, and X.
-                    X is treated as a don&apos;t-care.
-                  </p>
-                  <p>
-                    Renamed inputs can be used directly in formulas, for example{" "}
-                    <code>A xor B xor Cin</code>. A, B, C, and D stay available as aliases.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-        <section className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatusCard
-            label="Inputs"
-            value={`${variableCount} variables`}
-            detail={activeDisplayLabels.join(", ")}
-            tone="sky"
-          />
-          <StatusCard
-            label="Truth rows"
-            value={`${truthRows.length}`}
-            detail={`${outputSummary.ones} one, ${outputSummary.zeros} zero, ${outputSummary.dontCares} X`}
-            tone="emerald"
-          />
-          <StatusCard
-            label="SOP terms"
-            value={`${result.terms.length}`}
-            detail={formatSet(result.minterms)}
-            tone="amber"
-          />
-          <StatusCard
-            label="CMOS devices"
-            value={`${cmosPlan.transistorCount}`}
-            detail={cmosPlan.coreGateName}
-            tone="rose"
-          />
-        </section>
+        {activeWorkspace === "logic" && logicPanels.summary && (
+          <section className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatusCard
+              label="Inputs"
+              value={`${variableCount} variables`}
+              detail={activeDisplayLabels.join(", ")}
+              tone="sky"
+            />
+            <StatusCard
+              label="Truth rows"
+              value={`${truthRows.length}`}
+              detail={`${outputSummary.ones} one, ${outputSummary.zeros} zero, ${outputSummary.dontCares} X`}
+              tone="emerald"
+            />
+            <StatusCard
+              label="SOP terms"
+              value={`${result.terms.length}`}
+              detail={formatSet(result.minterms)}
+              tone="amber"
+            />
+            <StatusCard
+              label="CMOS devices"
+              value={`${cmosPlan.transistorCount}`}
+              detail={cmosPlan.coreGateName}
+              tone="rose"
+            />
+          </section>
+        )}
 
         <section className="surface-card relative mb-5 p-4">
           <div className="flex items-center justify-between gap-3">
@@ -366,6 +382,26 @@ export default function App() {
               </div>
               <div className="my-3 h-px bg-slate-100" />
               <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Examples
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {FORMULA_EXAMPLES.map((example) => (
+                  <button
+                    key={example}
+                    type="button"
+                    onClick={() => {
+                      setFormulaInput(example);
+                      setFormulaError("");
+                      setPresetsOpen(false);
+                    }}
+                    className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 font-mono text-xs text-slate-600 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
+              <div className="my-3 h-px bg-slate-100" />
+              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
                 Presets
               </span>
               <div className="grid gap-2">
@@ -431,25 +467,10 @@ export default function App() {
                 Generate
               </button>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {FORMULA_EXAMPLES.map((example) => (
-                <button
-                  key={example}
-                  type="button"
-                  onClick={() => {
-                    setFormulaInput(example);
-                    setFormulaError("");
-                  }}
-                  className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 font-mono text-xs text-slate-600 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
-                >
-                  {example}
-                </button>
-              ))}
-            </div>
-              <p className="text-xs font-medium text-slate-500">
-                Use variables:{" "}
-                <code className="text-slate-700">{activeDisplayLabels.join(", ")}</code>
-              </p>
+            <p className="text-xs font-medium text-slate-500">
+              Use variables:{" "}
+              <code className="text-slate-700">{activeDisplayLabels.join(", ")}</code>
+            </p>
             {formulaError && (
               <p
                 className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700"
@@ -463,151 +484,185 @@ export default function App() {
 
         <WorkspaceTabs
           activeWorkspace={activeWorkspace}
+          cmosPanels={cmosPanels}
+          displayOpen={displayOpen}
+          logicPanels={logicPanels}
           onChange={setActiveWorkspace}
+          onDisplayOpenChange={setDisplayOpen}
+          onResetDisplay={resetDisplay}
+          onToggleCmosPanel={toggleCmosPanel}
+          onToggleLogicPanel={toggleLogicPanel}
         />
 
         {activeWorkspace === "logic" ? (
           <>
-            <section className="surface-card p-4">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-                  Gate Diagram
-                </h2>
-                <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-1">
-                  {([
-                    ["curved", "Curve"],
-                    ["straight", "Straight"]
-                  ] as [GateWireStyle, string][]).map(([style, label]) => (
-                    <button
-                      key={style}
-                      type="button"
-                      onClick={() => setGateWireStyle(style)}
-                      className={`rounded px-2.5 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
-                        gateWireStyle === style
-                          ? "bg-white text-slate-900 shadow-sm"
-                          : "text-slate-500 hover:text-slate-800"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <GateDiagram
-                variableCount={variableCount}
-                terms={result.terms}
-                expression={result.expression}
-                wireStyle={gateWireStyle}
-                variableLabels={displayLabels}
-              />
-            </section>
+            {!hasLogicContent && <EmptyView workspace="Logic" />}
 
-            <div className="mt-5 grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
-              <section className="min-w-0">
-                <KMapPanel
-                  result={result}
-                  onToggle={handleToggle}
+            {logicPanels.diagram && (
+              <section className="surface-card p-4">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+                    Gate Diagram
+                  </h2>
+                  <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-1">
+                    {([
+                      ["curved", "Curve"],
+                      ["straight", "Straight"]
+                    ] as [GateWireStyle, string][]).map(([style, label]) => (
+                      <button
+                        key={style}
+                        type="button"
+                        onClick={() => setGateWireStyle(style)}
+                        className={`rounded px-2.5 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
+                          gateWireStyle === style
+                            ? "bg-white text-slate-900 shadow-sm"
+                            : "text-slate-500 hover:text-slate-800"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <GateDiagram
+                  variableCount={variableCount}
+                  terms={result.terms}
+                  expression={result.expression}
+                  wireStyle={gateWireStyle}
                   variableLabels={displayLabels}
                 />
               </section>
+            )}
 
-              <div className="grid min-w-0 gap-5">
-                <section className="surface-card p-4">
-                  <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-                    SOP / POS Forms
-                  </h2>
-                  <div className="mt-4 grid gap-3">
-                    <ExpressionBlock label="Minimized SOP" value={`F = ${displaySopExpression}`} />
-                    <ExpressionBlock label="Minimized POS" value={`F = ${displayPosExpression}`} />
-                  </div>
-                  <div className="mt-4 grid gap-2 text-sm text-slate-600">
-                    <Metric label="Minterms" value={formatSet(result.minterms)} />
-                    <Metric label="Maxterms" value={formatMaxterms(posResult.maxterms)} />
-                    <Metric label="Don't cares" value={formatSet(result.dontCares)} />
-                    <Metric
-                      label="SOP terms"
-                      value={
-                        result.terms
-                          .map((term) => formatProductTerm(term.literals, displayLabels))
-                          .join(", ") || "none"
-                      }
+            {showLogicMiddleRow && (
+              <div
+                className={`mt-5 grid min-w-0 gap-5 ${
+                  logicPanels.kmap && showLogicSideColumn
+                    ? "xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]"
+                    : ""
+                }`}
+              >
+                {logicPanels.kmap && (
+                  <section className="min-w-0">
+                    <KMapPanel
+                      result={result}
+                      onToggle={handleToggle}
+                      variableLabels={displayLabels}
                     />
-                    <Metric
-                      label="POS clauses"
-                      value={
-                        posResult.terms
-                          .map((term) => formatSumTerm(term.literals, displayLabels))
-                          .join(" ") || "none"
-                      }
-                    />
-                  </div>
-                </section>
+                  </section>
+                )}
 
-                <section className="surface-card p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-                      Verilog
-                    </h2>
-                    <button
-                      type="button"
-                      onClick={copyVerilog}
-                      className="control-button py-1.5 text-xs"
-                    >
-                      {copyState === "copied"
-                        ? "Copied"
-                        : copyState === "failed"
-                          ? "Copy failed"
-                          : "Copy"}
-                    </button>
+                {showLogicSideColumn && (
+                  <div className="grid min-w-0 gap-5">
+                    {logicPanels.forms && (
+                      <section className="surface-card p-4">
+                        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+                          SOP / POS Forms
+                        </h2>
+                        <div className="mt-4 grid gap-3">
+                          <ExpressionBlock label="Minimized SOP" value={`F = ${displaySopExpression}`} />
+                          <ExpressionBlock label="Minimized POS" value={`F = ${displayPosExpression}`} />
+                        </div>
+                        <div className="mt-4 grid gap-2 text-sm text-slate-600">
+                          <Metric label="Minterms" value={formatSet(result.minterms)} />
+                          <Metric label="Maxterms" value={formatMaxterms(posResult.maxterms)} />
+                          <Metric label="Don't cares" value={formatSet(result.dontCares)} />
+                          <Metric
+                            label="SOP terms"
+                            value={
+                              result.terms
+                                .map((term) => formatProductTerm(term.literals, displayLabels))
+                                .join(", ") || "none"
+                            }
+                          />
+                          <Metric
+                            label="POS clauses"
+                            value={
+                              posResult.terms
+                                .map((term) => formatSumTerm(term.literals, displayLabels))
+                                .join(" ") || "none"
+                            }
+                          />
+                        </div>
+                      </section>
+                    )}
+
+                    {logicPanels.verilog && (
+                      <section className="surface-card p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+                            Verilog
+                          </h2>
+                          <button
+                            type="button"
+                            onClick={copyVerilog}
+                            className="control-button py-1.5 text-xs"
+                          >
+                            {copyState === "copied"
+                              ? "Copied"
+                              : copyState === "failed"
+                                ? "Copy failed"
+                                : "Copy"}
+                          </button>
+                        </div>
+                        <pre className="mt-4 whitespace-pre-wrap break-words rounded-lg bg-slate-950 p-4 text-sm leading-6 text-emerald-100">
+                          <code>{verilogBundle}</code>
+                        </pre>
+                      </section>
+                    )}
                   </div>
-                  <pre className="mt-4 whitespace-pre-wrap break-words rounded-lg bg-slate-950 p-4 text-sm leading-6 text-emerald-100">
-                    <code>{verilogBundle}</code>
-                  </pre>
-                </section>
+                )}
               </div>
-            </div>
+            )}
 
-            <div className="mt-5">
-              <UniversalGatesPanel
-                conversions={gateConversions}
-                variableLabels={displayLabels}
-              />
-            </div>
+            {logicPanels.universal && (
+              <div className="mt-5">
+                <UniversalGatesPanel
+                  conversions={gateConversions}
+                  variableLabels={displayLabels}
+                />
+              </div>
+            )}
 
-            <div className="mt-5">
-              <TruthTable
-                variables={variables}
-                labels={activeDisplayLabels}
-                rows={truthRows}
-                onToggle={handleToggle}
-              />
-            </div>
+            {logicPanels.truth && (
+              <div className="mt-5">
+                <TruthTable
+                  variables={variables}
+                  labels={activeDisplayLabels}
+                  rows={truthRows}
+                  onToggle={handleToggle}
+                />
+              </div>
+            )}
           </>
         ) : (
           <div className="space-y-5">
-            <section className="surface-card p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-                  Current Logic
-                </h2>
-              </div>
-              <div className="mt-4 grid gap-3 text-sm text-slate-600 lg:grid-cols-4">
-                <Metric label="Simplified" value={`F = ${displaySopExpression}`} />
-                <Metric label="POS" value={`F = ${displayPosExpression}`} />
-                <Metric label="Core gate" value={cmosPlan.coreGateName} />
-                <Metric label="Transistors" value={`${cmosPlan.transistorCount}`} />
-              </div>
-            </section>
-
-            <CMOSPanel
-              includeOutputInverter={includeOutputInverter}
-              onIncludeOutputInverterChange={setIncludeOutputInverter}
-              plan={cmosPlan}
-            />
+            {!hasCmosContent ? (
+              <EmptyView workspace="CMOS" />
+            ) : (
+              <CMOSPanel
+                includeOutputInverter={includeOutputInverter}
+                onIncludeOutputInverterChange={setIncludeOutputInverter}
+                plan={cmosPlan}
+                visibleSections={cmosPanels}
+              />
+            )}
           </div>
         )}
       </div>
     </main>
+  );
+}
+function EmptyView({ workspace }: { workspace: Workspace | "Logic" | "CMOS" }) {
+  return (
+    <section className="surface-card p-6 text-center">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+        No {workspace} panels selected
+      </h2>
+      <p className="mt-2 text-sm text-slate-500">
+        Open Display to choose what appears here.
+      </p>
+    </section>
   );
 }
 
@@ -645,33 +700,115 @@ function StatusCard({
 
 function WorkspaceTabs({
   activeWorkspace,
-  onChange
+  cmosPanels,
+  displayOpen,
+  logicPanels,
+  onChange,
+  onDisplayOpenChange,
+  onResetDisplay,
+  onToggleCmosPanel,
+  onToggleLogicPanel
 }: {
   activeWorkspace: Workspace;
+  cmosPanels: PanelVisibility<CmosPanelId>;
+  displayOpen: boolean;
+  logicPanels: PanelVisibility<LogicPanelId>;
   onChange: (workspace: Workspace) => void;
+  onDisplayOpenChange: (open: boolean) => void;
+  onResetDisplay: () => void;
+  onToggleCmosPanel: (panel: CmosPanelId) => void;
+  onToggleLogicPanel: (panel: LogicPanelId) => void;
 }) {
-  return (
-    <div className="sticky top-3 z-10 mb-5 grid gap-2 rounded-lg border border-slate-200 bg-white/90 p-1 shadow-soft backdrop-blur sm:grid-cols-2">
-      {(["logic", "cmos"] as Workspace[]).map((workspace) => {
-        const active = workspace === activeWorkspace;
-        const label = workspace === "logic" ? "Logic" : "CMOS";
+  const activeOptions =
+    activeWorkspace === "logic" ? LOGIC_PANEL_OPTIONS : CMOS_PANEL_OPTIONS;
+  const activePanels = activeWorkspace === "logic" ? logicPanels : cmosPanels;
+  const selectedCount = Object.values(activePanels).filter(Boolean).length;
 
-        return (
+  return (
+    <div className="sticky top-3 z-10 mb-5 rounded-lg border border-slate-200 bg-white/90 p-1 shadow-soft backdrop-blur">
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_132px]">
+        <div className="grid gap-2 sm:grid-cols-2">
+          {(["logic", "cmos"] as Workspace[]).map((workspace) => {
+            const active = workspace === activeWorkspace;
+            const label = workspace === "logic" ? "Logic" : "CMOS";
+
+            return (
+              <button
+                key={workspace}
+                type="button"
+                onClick={() => {
+                  onChange(workspace);
+                  onDisplayOpenChange(false);
+                }}
+                className={`rounded-md px-4 py-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
+                  active
+                    ? "bg-slate-900 text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+                aria-pressed={active}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="relative">
           <button
-            key={workspace}
             type="button"
-            onClick={() => onChange(workspace)}
-            className={`rounded-md px-4 py-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
-              active
-                ? "bg-slate-900 text-white shadow-sm"
-                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-            }`}
-            aria-pressed={active}
+            onClick={() => onDisplayOpenChange(!displayOpen)}
+            className="h-full w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
+            aria-expanded={displayOpen}
           >
-            {label}
+            Display {selectedCount}
           </button>
-        );
-      })}
+          {displayOpen && (
+            <div className="absolute right-0 top-12 z-30 w-[min(320px,calc(100vw-32px))] rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Visible Panels
+                </span>
+                <button
+                  type="button"
+                  onClick={onResetDisplay}
+                  className="rounded px-2 py-1 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
+                >
+                  Reset
+                </button>
+              </div>
+              <div className="grid gap-2">
+                {activeOptions.map((option) => {
+                  const checked =
+                    activeWorkspace === "logic"
+                      ? logicPanels[option.id as LogicPanelId]
+                      : cmosPanels[option.id as CmosPanelId];
+
+                  return (
+                    <label
+                      key={option.id}
+                      className="flex cursor-pointer items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
+                    >
+                      <span>{option.label}</span>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          if (activeWorkspace === "logic") {
+                            onToggleLogicPanel(option.id as LogicPanelId);
+                          } else {
+                            onToggleCmosPanel(option.id as CmosPanelId);
+                          }
+                        }}
+                        className="h-4 w-4 accent-slate-950"
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

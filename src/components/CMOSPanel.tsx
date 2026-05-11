@@ -7,12 +7,26 @@ interface CMOSPanelProps {
   includeOutputInverter: boolean;
   onIncludeOutputInverterChange: (include: boolean) => void;
   plan: CmosPlan;
+  visibleSections?: {
+    netlist: boolean;
+    networks: boolean;
+    overview: boolean;
+    schematic: boolean;
+    sizing: boolean;
+  };
 }
 
 export function CMOSPanel({
   includeOutputInverter,
   onIncludeOutputInverterChange,
-  plan
+  plan,
+  visibleSections = {
+    netlist: true,
+    networks: true,
+    overview: true,
+    schematic: true,
+    sizing: true
+  }
 }: CMOSPanelProps) {
   const [styleOpen, setStyleOpen] = useState(false);
   const [symbolStyle, setSymbolStyle] = useState<CmosSymbolStyle>("compact");
@@ -49,16 +63,18 @@ export function CMOSPanel({
           <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600">
             {plan.coreGateName}
           </span>
-          <button
-            type="button"
-            onClick={() => setStyleOpen((open) => !open)}
-            className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
-            aria-expanded={styleOpen}
-          >
-            Style
-          </button>
+          {visibleSections.schematic && (
+            <button
+              type="button"
+              onClick={() => setStyleOpen((open) => !open)}
+              className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
+              aria-expanded={styleOpen}
+            >
+              Style
+            </button>
+          )}
         </div>
-        {styleOpen && (
+        {visibleSections.schematic && styleOpen && (
           <div className="absolute right-0 top-12 z-20 w-[min(300px,calc(100vw-48px))] rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
             <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
               CMOS symbol style
@@ -96,55 +112,63 @@ export function CMOSPanel({
         )}
       </div>
 
-      <div className="mt-4 grid gap-3 text-sm text-slate-600 lg:grid-cols-2">
-        <Metric label="Simplified" value={plan.functionExpression} />
-        <Metric label="CMOS-friendly" value={plan.cmosFriendlyExpression} />
-        <Metric label="Transistors" value={`${plan.transistorCount}`} />
-        <Metric
-          label="Output stage"
-          value={plan.outputInverterIncluded ? "restoring inverter included" : "core output only"}
-        />
-        <Metric
-          label="Input complements"
-          value={
-            plan.inputInverters.length > 0
-              ? plan.inputInverters.map((variable) => `${variable}'`).join(", ")
-              : "none"
-          }
-        />
-      </div>
+      {visibleSections.overview && (
+        <div className="mt-4 grid gap-3 text-sm text-slate-600 lg:grid-cols-2">
+          <Metric label="Simplified" value={plan.functionExpression} />
+          <Metric label="CMOS-friendly" value={plan.cmosFriendlyExpression} />
+          <Metric label="Transistors" value={`${plan.transistorCount}`} />
+          <Metric
+            label="Output stage"
+            value={plan.outputInverterIncluded ? "restoring inverter included" : "core output only"}
+          />
+          <Metric
+            label="Input complements"
+            value={
+              plan.inputInverters.length > 0
+                ? plan.inputInverters.map((variable) => `${variable}'`).join(", ")
+                : "none"
+            }
+          />
+        </div>
+      )}
 
-      <div className="mt-4 grid gap-3 text-sm text-slate-600 lg:grid-cols-2">
-        <NetworkCard
-          title="Pull-up network"
-          badge="PMOS PUN"
-          node={plan.pullUp}
-          fallback={plan.pullUpDescription}
-          tone="pmos"
-        />
-        <NetworkCard
-          title="Pull-down network"
-          badge="NMOS PDN"
-          node={plan.pullDown}
-          fallback={plan.pullDownDescription}
-          tone="nmos"
-        />
-      </div>
+      {visibleSections.networks && (
+        <div className="mt-4 grid gap-3 text-sm text-slate-600 lg:grid-cols-2">
+          <NetworkCard
+            title="Pull-up network"
+            badge="PMOS PUN"
+            node={plan.pullUp}
+            fallback={plan.pullUpDescription}
+            tone="pmos"
+          />
+          <NetworkCard
+            title="Pull-down network"
+            badge="NMOS PDN"
+            node={plan.pullDown}
+            fallback={plan.pullDownDescription}
+            tone="nmos"
+          />
+        </div>
+      )}
 
-      <SizingPanel plan={plan} />
+      {visibleSections.sizing && <SizingPanel plan={plan} />}
 
-      <div className="mt-4">
-        <CMOSSchematic plan={plan} symbolStyle={symbolStyle} />
-      </div>
+      {visibleSections.schematic && (
+        <div className="mt-4">
+          <CMOSSchematic plan={plan} symbolStyle={symbolStyle} />
+        </div>
+      )}
 
-      <div className="mt-4">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          SPICE-like Netlist
-        </h3>
-        <pre className="mt-2 max-h-72 overflow-auto rounded-lg bg-slate-950 p-4 text-xs leading-5 text-cyan-100">
-          <code>{plan.netlist}</code>
-        </pre>
-      </div>
+      {visibleSections.netlist && (
+        <div className="mt-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            SPICE-like Netlist
+          </h3>
+          <pre className="mt-2 max-h-72 overflow-auto rounded-lg bg-slate-950 p-4 text-xs leading-5 text-cyan-100">
+            <code>{plan.netlist}</code>
+          </pre>
+        </div>
+      )}
     </section>
   );
 }
