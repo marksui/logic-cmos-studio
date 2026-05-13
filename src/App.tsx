@@ -408,7 +408,7 @@ export default function App() {
   return (
     <main className="app-shell min-h-screen overflow-x-hidden text-slate-900">
       <header className="border-b border-white/70 bg-white/85 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-slate-950 text-sm font-bold text-white shadow-soft">
               LC
@@ -427,6 +427,14 @@ export default function App() {
               </p>
             </div>
           </div>
+          <a
+            className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-soft transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 focus-visible:ring-offset-2"
+            href="https://marksui.github.io/Hardware_Interview_Trainer/"
+            rel="noreferrer"
+            target="_blank"
+          >
+            Hardware Interview Trainer
+          </a>
         </div>
       </header>
 

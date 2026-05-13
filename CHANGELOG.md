@@ -2,6 +2,11 @@
 
 All notable changes to Logic & CMOS Studio are summarized here.
 
+## v1.3.16 - 2026-05-13
+
+- Added a header link to the companion Hardware Interview Trainer portfolio project.
+- Added a README related-project link for the local-first hardware interview question bank.
+
 ## v1.3.15 - 2026-05-11
 
 - Trimmed README by removing local run, build, GitHub Pages deployment, and project rationale sections from the public-facing document.
