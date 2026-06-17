@@ -2,6 +2,10 @@
 
 All notable changes to Logic & CMOS Studio are summarized here.
 
+## v1.3.18 - 2026-06-17
+
+- Added one-click Display quick views for Logic and CMOS so users can switch between learning, truth-table, export, schematic, network, and netlist-focused layouts without manually toggling every panel.
+
 ## v1.3.17 - 2026-06-17
 
 - Remembered the user's last formula, generated truth values, panel visibility, active workspace, gate-wire style, and CMOS output inverter setting in localStorage.

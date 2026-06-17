@@ -45,6 +45,11 @@ type LogicPanelId =
   | "truth";
 type CmosPanelId = "overview" | "networks" | "sizing" | "schematic" | "netlist";
 type PanelVisibility<T extends string> = Record<T, boolean>;
+type ViewPreset<T extends string> = {
+  description: string;
+  label: string;
+  panels: PanelVisibility<T>;
+};
 
 const FORMULA_EXAMPLES = [
   "buffer A",
@@ -184,6 +189,79 @@ const CMOS_PANEL_OPTIONS: { id: CmosPanelId; label: string }[] = [
   { id: "sizing", label: "Sizing" },
   { id: "schematic", label: "Schematic" },
   { id: "netlist", label: "Netlist" }
+];
+const LOGIC_VIEW_PRESETS: ViewPreset<LogicPanelId>[] = [
+  {
+    description: "diagram, K-map, SOP/POS",
+    label: "Learn",
+    panels: {
+      diagram: true,
+      forms: true,
+      kmap: true,
+      truth: false,
+      universal: false,
+      verilog: false
+    }
+  },
+  {
+    description: "truth table + K-map",
+    label: "Truth",
+    panels: {
+      diagram: false,
+      forms: true,
+      kmap: true,
+      truth: true,
+      universal: false,
+      verilog: false
+    }
+  },
+  {
+    description: "equations, gates, Verilog",
+    label: "Export",
+    panels: {
+      diagram: false,
+      forms: true,
+      kmap: false,
+      truth: false,
+      universal: true,
+      verilog: true
+    }
+  }
+];
+const CMOS_VIEW_PRESETS: ViewPreset<CmosPanelId>[] = [
+  {
+    description: "summary + schematic",
+    label: "Study",
+    panels: {
+      netlist: false,
+      networks: false,
+      overview: true,
+      schematic: true,
+      sizing: false
+    }
+  },
+  {
+    description: "PUN/PDN + sizing",
+    label: "Network",
+    panels: {
+      netlist: false,
+      networks: true,
+      overview: true,
+      schematic: true,
+      sizing: true
+    }
+  },
+  {
+    description: "schematic + netlist",
+    label: "SPICE",
+    panels: {
+      netlist: true,
+      networks: false,
+      overview: true,
+      schematic: true,
+      sizing: false
+    }
+  }
 ];
 
 const DEFAULT_INPUT_LABELS = Object.fromEntries(
@@ -347,6 +425,16 @@ export default function App() {
     }
   }
 
+  function applyLogicViewPreset(panels: PanelVisibility<LogicPanelId>) {
+    setLogicPanels({ ...panels });
+    setDisplayOpen(false);
+  }
+
+  function applyCmosViewPreset(panels: PanelVisibility<CmosPanelId>) {
+    setCmosPanels({ ...panels });
+    setDisplayOpen(false);
+  }
+
   function resetWorkspace() {
     const defaultCount = DEFAULT_PRESET.variableCount;
     setActiveWorkspace("logic");
@@ -497,6 +585,8 @@ export default function App() {
           cmosPanels={cmosPanels}
           displayOpen={displayOpen}
           logicPanels={logicPanels}
+          onApplyCmosPreset={applyCmosViewPreset}
+          onApplyLogicPreset={applyLogicViewPreset}
           onChange={setActiveWorkspace}
           onDisplayOpenChange={setDisplayOpen}
           onResetDisplay={resetDisplay}
@@ -1237,6 +1327,8 @@ function WorkspaceTabs({
   cmosPanels,
   displayOpen,
   logicPanels,
+  onApplyCmosPreset,
+  onApplyLogicPreset,
   onChange,
   onDisplayOpenChange,
   onResetDisplay,
@@ -1248,6 +1340,8 @@ function WorkspaceTabs({
   cmosPanels: PanelVisibility<CmosPanelId>;
   displayOpen: boolean;
   logicPanels: PanelVisibility<LogicPanelId>;
+  onApplyCmosPreset: (panels: PanelVisibility<CmosPanelId>) => void;
+  onApplyLogicPreset: (panels: PanelVisibility<LogicPanelId>) => void;
   onChange: (workspace: Workspace) => void;
   onDisplayOpenChange: (open: boolean) => void;
   onResetDisplay: () => void;
@@ -1263,6 +1357,12 @@ function WorkspaceTabs({
         ? CMOS_PANEL_OPTIONS
         : [];
   const activePanels = activeWorkspace === "logic" ? logicPanels : cmosPanels;
+  const activePresets =
+    activeWorkspace === "logic"
+      ? LOGIC_VIEW_PRESETS
+      : activeWorkspace === "cmos"
+        ? CMOS_VIEW_PRESETS
+        : [];
   const selectedCount = hasDisplayControls
     ? Object.values(activePanels).filter(Boolean).length
     : 0;
@@ -1317,6 +1417,36 @@ function WorkspaceTabs({
           </button>
           {displayOpen && (
             <div className="absolute right-0 top-12 z-30 w-[min(320px,calc(100vw-32px))] rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
+              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Quick Views
+              </span>
+              <div className="mb-3 grid gap-2">
+                {activePresets.map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      if (activeWorkspace === "logic") {
+                        onApplyLogicPreset(
+                          preset.panels as PanelVisibility<LogicPanelId>
+                        );
+                      } else if (activeWorkspace === "cmos") {
+                        onApplyCmosPreset(
+                          preset.panels as PanelVisibility<CmosPanelId>
+                        );
+                      }
+                    }}
+                    className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left transition hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
+                  >
+                    <span className="block text-sm font-semibold text-slate-800">
+                      {preset.label}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-slate-500">
+                      {preset.description}
+                    </span>
+                  </button>
+                ))}
+              </div>
               <div className="mb-2 flex items-center justify-between gap-3">
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                   Visible Panels
