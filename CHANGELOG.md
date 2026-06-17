@@ -2,6 +2,12 @@
 
 All notable changes to Logic & CMOS Studio are summarized here.
 
+## v1.3.17 - 2026-06-17
+
+- Remembered the user's last formula, generated truth values, panel visibility, active workspace, gate-wire style, and CMOS output inverter setting in localStorage.
+- Added Reset workspace actions that clear the formula and restore default variables, panel visibility, output stage, and workspace state.
+- Moved the CMOS output inverter toggle into the main formula area so it can be changed directly from the Logic workspace.
+
 ## v1.3.16 - 2026-05-13
 
 - Added a header link to the companion Hardware Interview Trainer portfolio project.

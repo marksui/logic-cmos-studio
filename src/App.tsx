@@ -190,29 +190,50 @@ const DEFAULT_INPUT_LABELS = Object.fromEntries(
   ALL_VARIABLES.map((variable) => [variable, variable])
 ) as Record<LogicVariable, string>;
 
+const STUDIO_SESSION_KEY = "logic-cmos-studio.session.v1";
+
+interface StudioSessionState {
+  activeWorkspace: Workspace;
+  cmosPanels: PanelVisibility<CmosPanelId>;
+  formulaInput: string;
+  gateWireStyle: GateWireStyle;
+  includeOutputInverter: boolean;
+  inputLabels: Record<LogicVariable, string>;
+  logicPanels: PanelVisibility<LogicPanelId>;
+  rawValues: OutputValue[];
+  variableCount: VariableCount;
+}
+
 export default function App() {
+  const initialSession = useMemo(loadInitialStudioSession, []);
   const [variableCount, setVariableCount] = useState<VariableCount>(
-    DEFAULT_PRESET.variableCount
+    initialSession.variableCount
   );
   const [rawValues, setRawValues] = useState<OutputValue[]>(
-    DEFAULT_PRESET.makeValues()
+    initialSession.rawValues
   );
   const [formulaInput, setFormulaInput] = useState(() =>
-    getInitialFormulaInput(DEFAULT_PRESET.formula)
+    initialSession.formulaInput
   );
   const [formulaError, setFormulaError] = useState("");
   const [presetsOpen, setPresetsOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [displayOpen, setDisplayOpen] = useState(false);
-  const [activeWorkspace, setActiveWorkspace] = useState<Workspace>("logic");
+  const [activeWorkspace, setActiveWorkspace] = useState<Workspace>(
+    initialSession.activeWorkspace
+  );
   const [logicPanels, setLogicPanels] =
-    useState<PanelVisibility<LogicPanelId>>(DEFAULT_LOGIC_PANELS);
+    useState<PanelVisibility<LogicPanelId>>(initialSession.logicPanels);
   const [cmosPanels, setCmosPanels] =
-    useState<PanelVisibility<CmosPanelId>>(DEFAULT_CMOS_PANELS);
+    useState<PanelVisibility<CmosPanelId>>(initialSession.cmosPanels);
   const [inputLabels, setInputLabels] =
-    useState<Record<LogicVariable, string>>(DEFAULT_INPUT_LABELS);
-  const [gateWireStyle, setGateWireStyle] = useState<GateWireStyle>("straight");
-  const [includeOutputInverter, setIncludeOutputInverter] = useState(false);
+    useState<Record<LogicVariable, string>>(initialSession.inputLabels);
+  const [gateWireStyle, setGateWireStyle] = useState<GateWireStyle>(
+    initialSession.gateWireStyle
+  );
+  const [includeOutputInverter, setIncludeOutputInverter] = useState(
+    initialSession.includeOutputInverter
+  );
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const [expressionCopyState, setExpressionCopyState] =
     useState<CopyState>("idle");
@@ -287,15 +308,28 @@ export default function App() {
   const hasCmosContent = Object.values(cmosPanels).some(Boolean);
 
   useEffect(() => {
-    const expression = getUrlExpression();
-    if (expression) {
-      applyFormulaText(expression, {
-        currentVariableCount: DEFAULT_PRESET.variableCount,
-        labels: DEFAULT_INPUT_LABELS,
-        syncUrl: false
-      });
-    }
-  }, []);
+    writeStoredStudioSession({
+      activeWorkspace,
+      cmosPanels,
+      formulaInput,
+      gateWireStyle,
+      includeOutputInverter,
+      inputLabels,
+      logicPanels,
+      rawValues: values,
+      variableCount
+    });
+  }, [
+    activeWorkspace,
+    cmosPanels,
+    formulaInput,
+    gateWireStyle,
+    includeOutputInverter,
+    inputLabels,
+    logicPanels,
+    values,
+    variableCount
+  ]);
 
   function toggleLogicPanel(panel: LogicPanelId) {
     setLogicPanels((current) => ({ ...current, [panel]: !current[panel] }));
@@ -311,6 +345,25 @@ export default function App() {
     } else {
       setCmosPanels(DEFAULT_CMOS_PANELS);
     }
+  }
+
+  function resetWorkspace() {
+    const defaultCount = DEFAULT_PRESET.variableCount;
+    setActiveWorkspace("logic");
+    setCmosPanels(DEFAULT_CMOS_PANELS);
+    setDisplayOpen(false);
+    setFormulaError("");
+    setFormulaInput("");
+    setGateWireStyle("straight");
+    setGuideOpen(false);
+    setIncludeOutputInverter(false);
+    setInputLabels(DEFAULT_INPUT_LABELS);
+    setLogicPanels(DEFAULT_LOGIC_PANELS);
+    setPresetsOpen(false);
+    setRawValues(makeClearedValues(defaultCount));
+    setVariableCount(defaultCount);
+    clearStoredStudioSession();
+    clearExpressionFromUrl();
   }
 
   function handleVariableCountChange(nextCount: VariableCount) {
@@ -447,6 +500,7 @@ export default function App() {
           onChange={setActiveWorkspace}
           onDisplayOpenChange={setDisplayOpen}
           onResetDisplay={resetDisplay}
+          onResetWorkspace={resetWorkspace}
           onToggleCmosPanel={toggleCmosPanel}
           onToggleLogicPanel={toggleLogicPanel}
         />
@@ -467,6 +521,13 @@ export default function App() {
                 className="control-button py-1.5 text-xs"
               >
                 Guide
+              </button>
+              <button
+                type="button"
+                onClick={resetWorkspace}
+                className="control-button py-1.5 text-xs"
+              >
+                Reset
               </button>
               <button
                 type="button"
@@ -644,6 +705,23 @@ export default function App() {
                 from the formula, up to {MAX_VARIABLE_COUNT} inputs
               </span>
             </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIncludeOutputInverter((include) => !include)}
+                className={`rounded-md border px-3 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
+                  includeOutputInverter
+                    ? "border-slate-900 bg-slate-900 text-white"
+                    : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-white"
+                }`}
+                aria-pressed={includeOutputInverter}
+              >
+                CMOS output {includeOutputInverter ? "+ INV" : "core"}
+              </button>
+              <span className="text-xs leading-5 text-slate-400">
+                Switches the CMOS output stage without leaving Logic.
+              </span>
+            </div>
             {formulaError && (
               <p
                 className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700"
@@ -1162,6 +1240,7 @@ function WorkspaceTabs({
   onChange,
   onDisplayOpenChange,
   onResetDisplay,
+  onResetWorkspace,
   onToggleCmosPanel,
   onToggleLogicPanel
 }: {
@@ -1172,6 +1251,7 @@ function WorkspaceTabs({
   onChange: (workspace: Workspace) => void;
   onDisplayOpenChange: (open: boolean) => void;
   onResetDisplay: () => void;
+  onResetWorkspace: () => void;
   onToggleCmosPanel: (panel: CmosPanelId) => void;
   onToggleLogicPanel: (panel: LogicPanelId) => void;
 }) {
@@ -1278,6 +1358,13 @@ function WorkspaceTabs({
                   );
                 })}
               </div>
+              <button
+                type="button"
+                onClick={onResetWorkspace}
+                className="mt-3 w-full rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/30"
+              >
+                Reset workspace
+              </button>
             </div>
           )}
         </div>
@@ -1438,10 +1525,6 @@ function normalizeInputLabels(
   ) as Record<LogicVariable, string>;
 }
 
-function getInitialFormulaInput(fallback: string): string {
-  return getUrlExpression() ?? fallback;
-}
-
 function getUrlExpression(): string | null {
   if (typeof window === "undefined") return null;
 
@@ -1457,10 +1540,200 @@ function syncExpressionToUrl(expression: string) {
   window.history.replaceState(null, "", url);
 }
 
+function clearExpressionFromUrl() {
+  if (typeof window === "undefined") return;
+
+  const url = new URL(window.location.href);
+  url.searchParams.delete("expr");
+  window.history.replaceState(null, "", url);
+}
+
 function buildShareUrl(expression: string): string {
   if (typeof window === "undefined") return `?expr=${encodeURIComponent(expression)}`;
 
   const url = new URL(window.location.href);
   url.searchParams.set("expr", expression);
   return url.toString();
+}
+
+function loadInitialStudioSession(): StudioSessionState {
+  const fallback = makeDefaultStudioSession();
+  const urlExpression = getUrlExpression();
+
+  if (urlExpression) {
+    return makeSessionFromFormula(urlExpression, fallback);
+  }
+
+  const stored = readStoredStudioSession();
+  if (!stored) return fallback;
+
+  const formulaInput =
+    typeof stored.formulaInput === "string"
+      ? stored.formulaInput
+      : fallback.formulaInput;
+  const variableCount = normalizeStoredVariableCount(
+    stored.variableCount,
+    fallback.variableCount
+  );
+
+  return {
+    activeWorkspace: normalizeStoredWorkspace(
+      stored.activeWorkspace,
+      fallback.activeWorkspace
+    ),
+    cmosPanels: normalizeStoredPanels(stored.cmosPanels, DEFAULT_CMOS_PANELS),
+    formulaInput,
+    gateWireStyle: stored.gateWireStyle === "curved" ? "curved" : "straight",
+    includeOutputInverter:
+      typeof stored.includeOutputInverter === "boolean"
+        ? stored.includeOutputInverter
+        : fallback.includeOutputInverter,
+    inputLabels: normalizeStoredInputLabels(stored.inputLabels),
+    logicPanels: normalizeStoredPanels(stored.logicPanels, DEFAULT_LOGIC_PANELS),
+    rawValues: normalizeStoredOutputValues(stored.rawValues, variableCount),
+    variableCount
+  };
+}
+
+function makeDefaultStudioSession(): StudioSessionState {
+  return {
+    activeWorkspace: "logic",
+    cmosPanels: DEFAULT_CMOS_PANELS,
+    formulaInput: DEFAULT_PRESET.formula,
+    gateWireStyle: "straight",
+    includeOutputInverter: false,
+    inputLabels: DEFAULT_INPUT_LABELS,
+    logicPanels: DEFAULT_LOGIC_PANELS,
+    rawValues: DEFAULT_PRESET.makeValues(),
+    variableCount: DEFAULT_PRESET.variableCount
+  };
+}
+
+function makeSessionFromFormula(
+  formula: string,
+  fallback: StudioSessionState
+): StudioSessionState {
+  try {
+    const evaluation = evaluateFormula(
+      formula,
+      DEFAULT_PRESET.variableCount,
+      DEFAULT_INPUT_LABELS
+    );
+
+    return {
+      ...fallback,
+      formulaInput: formula,
+      inputLabels: evaluation.variableLabels,
+      rawValues: evaluation.values,
+      variableCount: evaluation.variableCount
+    };
+  } catch {
+    return { ...fallback, formulaInput: formula };
+  }
+}
+
+function readStoredStudioSession(): Partial<StudioSessionState> | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.localStorage.getItem(STUDIO_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return isPlainRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredStudioSession(session: StudioSessionState) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(STUDIO_SESSION_KEY, JSON.stringify(session));
+  } catch {
+    // Storage can be unavailable in private browsing; the app still works.
+  }
+}
+
+function clearStoredStudioSession() {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.removeItem(STUDIO_SESSION_KEY);
+  } catch {
+    // Ignore storage failures during reset.
+  }
+}
+
+function normalizeStoredWorkspace(
+  value: unknown,
+  fallback: Workspace
+): Workspace {
+  return value === "logic" || value === "cmos" || value === "review"
+    ? value
+    : fallback;
+}
+
+function normalizeStoredVariableCount(
+  value: unknown,
+  fallback: VariableCount
+): VariableCount {
+  const count = Number(value);
+  return Number.isInteger(count) &&
+    count >= MIN_VARIABLE_COUNT &&
+    count <= MAX_VARIABLE_COUNT
+    ? count
+    : fallback;
+}
+
+function normalizeStoredInputLabels(
+  value: unknown
+): Record<LogicVariable, string> {
+  const source = isPlainRecord(value) ? value : {};
+  const labels = Object.fromEntries(
+    ALL_VARIABLES.map((variable) => [
+      variable,
+      typeof source[variable] === "string"
+        ? source[variable]
+        : DEFAULT_INPUT_LABELS[variable]
+    ])
+  ) as Record<LogicVariable, string>;
+
+  return normalizeInputLabels(labels);
+}
+
+function normalizeStoredOutputValues(
+  value: unknown,
+  variableCount: VariableCount
+): OutputValue[] {
+  const rawValues = Array.isArray(value)
+    ? value.map((entry) => (isOutputValue(entry) ? entry : "0"))
+    : [];
+
+  return normalizeValues(variableCount, rawValues);
+}
+
+function normalizeStoredPanels<T extends string>(
+  value: unknown,
+  defaults: PanelVisibility<T>
+): PanelVisibility<T> {
+  const source = isPlainRecord(value) ? value : {};
+  return Object.fromEntries(
+    Object.entries(defaults).map(([key, defaultValue]) => [
+      key,
+      typeof source[key] === "boolean" ? source[key] : defaultValue
+    ])
+  ) as PanelVisibility<T>;
+}
+
+function isOutputValue(value: unknown): value is OutputValue {
+  return value === "0" || value === "1" || value === "X";
+}
+
+function makeClearedValues(variableCount: VariableCount): OutputValue[] {
+  return Array.from({ length: 1 << variableCount }, () => "0");
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
