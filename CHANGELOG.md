@@ -2,6 +2,11 @@
 
 All notable changes to Logic & CMOS Studio are summarized here.
 
+## v1.3.19 - 2026-06-17
+
+- Simplified the Formula Presets menu by removing manual variable-count controls; inputs now stay driven by the parsed formula or selected preset.
+- Made Formula examples apply and regenerate immediately, so users no longer need a second Generate click after choosing an example.
+
 ## v1.3.18 - 2026-06-17
 
 - Added one-click Display quick views for Logic and CMOS so users can switch between learning, truth-table, export, schematic, network, and netlist-focused layouts without manually toggling every panel.

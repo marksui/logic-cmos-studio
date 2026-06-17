@@ -29,10 +29,6 @@ import type {
   VariableCount
 } from "./logic/types";
 
-const VARIABLE_COUNTS: VariableCount[] = Array.from(
-  { length: MAX_VARIABLE_COUNT - MIN_VARIABLE_COUNT + 1 },
-  (_, index) => MIN_VARIABLE_COUNT + index
-);
 const DEFAULT_PRESET = PRESETS.find((preset) => preset.id === "majority")!;
 type Workspace = "logic" | "cmos" | "review";
 type CopyState = "idle" | "copied" | "failed";
@@ -454,11 +450,6 @@ export default function App() {
     clearExpressionFromUrl();
   }
 
-  function handleVariableCountChange(nextCount: VariableCount) {
-    setVariableCount(nextCount);
-    setRawValues((current) => normalizeValues(nextCount, current));
-  }
-
   function handleToggle(minterm: number) {
     setRawValues((current) => {
       const next = normalizeValues(variableCount, current);
@@ -644,31 +635,6 @@ export default function App() {
             <div className="absolute right-4 top-12 z-20 max-h-[calc(100vh-120px)] w-[min(520px,calc(100vw-48px))] overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
               <div>
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  Variables
-                </span>
-                <div className="grid grid-cols-4 gap-2">
-                  {VARIABLE_COUNTS.map((count) => (
-                    <button
-                      key={count}
-                      type="button"
-                      onClick={() => {
-                        handleVariableCountChange(count);
-                        setPresetsOpen(false);
-                      }}
-                      className={`rounded-md border px-2 py-2 text-xs font-semibold transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
-                        count === variableCount
-                          ? "border-slate-900 bg-slate-900 text-white hover:bg-slate-900"
-                          : "border-slate-200 text-slate-600"
-                      }`}
-                    >
-                      {count} vars
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="my-3 h-px bg-slate-100" />
-              <div>
-                <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
                   Detected inputs
                 </span>
                 <div className="flex flex-wrap gap-2">
@@ -686,7 +652,7 @@ export default function App() {
                   ))}
                 </div>
                 <p className="mt-2 text-xs leading-5 text-slate-400">
-                  Names come from the formula after Generate or preset selection.
+                  Inputs are detected from the formula after Generate or preset selection.
                 </p>
               </div>
               <div className="my-3 h-px bg-slate-100" />
@@ -699,8 +665,7 @@ export default function App() {
                     key={example}
                     type="button"
                     onClick={() => {
-                      setFormulaInput(example);
-                      setFormulaError("");
+                      applyFormulaText(example, { labels: DEFAULT_INPUT_LABELS });
                       setPresetsOpen(false);
                     }}
                     className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 font-mono text-xs text-slate-600 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
