@@ -2,6 +2,11 @@
 
 All notable changes to Logic & CMOS Studio are summarized here.
 
+## v1.3.23 - 2026-06-17
+
+- Moved bulk truth-table output actions out of the Formula Presets menu and into the Truth Table panel where they belong.
+- Added compact "Set all" controls to the Truth Table header, keeping formula presets focused on formula selection only.
+
 ## v1.3.22 - 2026-06-17
 
 - Simplified the Formula toolbar by removing the duplicate workspace reset action from the main path.

@@ -703,25 +703,6 @@ export default function App() {
                   );
                 })}
               </div>
-              <div className="mt-3 grid grid-cols-4 gap-2">
-                <button
-                  type="button"
-                  onClick={() => fillOutputs("0")}
-                  className="rounded-md border border-slate-200 px-2 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
-                >
-                  Clear
-                </button>
-                {(["0", "1", "X"] as OutputValue[]).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => fillOutputs(value)}
-                    className="rounded-md border border-slate-200 px-2 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
-                  >
-                    All {value}
-                  </button>
-                ))}
-              </div>
             </div>
           )}
           <form
@@ -989,6 +970,7 @@ export default function App() {
                   variables={variables}
                   labels={activeDisplayLabels}
                   rows={truthRows}
+                  onFillOutputs={fillOutputs}
                   onToggle={handleToggle}
                 />
               </div>

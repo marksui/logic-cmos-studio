@@ -4,6 +4,7 @@ interface TruthTableProps {
   variables: LogicVariable[];
   labels?: string[];
   rows: TruthRow[];
+  onFillOutputs?: (value: OutputValue) => void;
   onToggle: (minterm: number) => void;
 }
 
@@ -11,14 +12,38 @@ export function TruthTable({
   variables,
   labels = variables,
   rows,
+  onFillOutputs,
   onToggle
 }: TruthTableProps) {
   return (
     <div className="surface-card overflow-hidden">
-      <div className="border-b border-slate-200 px-4 py-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-          Truth Table
-        </h2>
+      <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+            Truth Table
+          </h2>
+          <p className="mt-1 text-xs leading-5 text-slate-400">
+            Click F cells to cycle 0, 1, and X.
+          </p>
+        </div>
+        {onFillOutputs && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Set all
+            </span>
+            {(["0", "1", "X"] as OutputValue[]).map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => onFillOutputs(value)}
+                className="grid h-9 min-w-9 place-items-center rounded-md border border-slate-200 bg-slate-50 px-2 text-xs font-semibold text-slate-600 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
+                aria-label={`Set all truth table outputs to ${value}`}
+              >
+                {value}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <div className="max-h-[560px] overflow-auto">
         <table className="w-full border-collapse text-sm">
