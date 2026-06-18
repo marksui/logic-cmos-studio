@@ -2,6 +2,11 @@
 
 All notable changes to Logic & CMOS Studio are summarized here.
 
+## v1.3.22 - 2026-06-17
+
+- Simplified the Formula toolbar by removing the duplicate workspace reset action from the main path.
+- Increased the Formula action buttons' touch target height while keeping reset available in the Display menu.
+
 ## v1.3.21 - 2026-06-17
 
 - Improved the Formula toolbar on narrow screens by letting actions wrap into a compact two-column layout.

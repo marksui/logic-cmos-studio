@@ -592,30 +592,22 @@ export default function App() {
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
               Formula
             </h2>
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+            <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center">
               <button
                 type="button"
                 onClick={() => {
                   setGuideOpen(true);
                   setPresetsOpen(false);
                 }}
-                className="control-button py-1.5 text-xs"
+                className="control-button min-h-11 py-2 text-xs"
                 aria-label="Open formula guide"
               >
                 Guide
               </button>
               <button
                 type="button"
-                onClick={resetWorkspace}
-                className="control-button py-1.5 text-xs"
-                aria-label="Reset workspace"
-              >
-                Reset
-              </button>
-              <button
-                type="button"
                 onClick={copyShareUrl}
-                className="control-button py-1.5 text-xs"
+                className="control-button min-h-11 py-2 text-xs"
                 aria-label="Copy shareable URL"
               >
                 {shareCopyState === "copied"
@@ -627,7 +619,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setPresetsOpen((open) => !open)}
-                className="control-button py-1.5 text-xs"
+                className="control-button min-h-11 py-2 text-xs"
                 aria-expanded={presetsOpen}
                 aria-label="Open formula presets"
               >
