@@ -372,11 +372,10 @@ export default function App() {
     () => `F = ${displaySopExpression}`,
     [displaySopExpression]
   );
-  const showLogicMiddleRow = logicPanels.kmap || logicPanels.forms || logicPanels.verilog;
   const showLogicSideColumn = logicPanels.forms || logicPanels.verilog;
-  const hasLogicContent =
+  const hasLogicCanvasContent =
     logicPanels.diagram ||
-    showLogicMiddleRow ||
+    logicPanels.kmap ||
     logicPanels.universal ||
     logicPanels.truth;
   const hasCmosContent = Object.values(cmosPanels).some(Boolean);
@@ -537,10 +536,397 @@ export default function App() {
     window.setTimeout(() => setState("idle"), 1400);
   }
 
+  const formulaPanel =
+    activeWorkspace !== "review" ? (
+      <section className="surface-card relative p-4">
+        <div className="flex flex-col gap-3">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+              Formula
+            </h2>
+            <p className="mt-1 text-xs leading-5 text-slate-400">
+              Type once, then use the center canvas and result rail to inspect it.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setGuideOpen(true);
+                setPresetsOpen(false);
+              }}
+              className="control-button min-h-11 py-2 text-xs"
+              aria-label="Open formula guide"
+            >
+              Guide
+            </button>
+            <button
+              type="button"
+              onClick={copyShareUrl}
+              className="control-button min-h-11 py-2 text-xs"
+              aria-label="Copy shareable URL"
+            >
+              {shareCopyState === "copied"
+                ? "URL copied"
+                : shareCopyState === "failed"
+                  ? "Copy failed"
+                  : "Share"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPresetsOpen((open) => !open)}
+              className="control-button min-h-11 py-2 text-xs"
+              aria-expanded={presetsOpen}
+              aria-label="Open formula presets"
+            >
+              Presets
+            </button>
+          </div>
+        </div>
+        {presetsOpen && (
+          <div className="z-20 mt-3 max-h-[min(62vh,560px)] w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
+            <div>
+              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Detected inputs
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {variables.map((variable, index) => (
+                  <span
+                    key={variable}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600"
+                  >
+                    <span className="font-mono text-slate-400">{variable}</span>
+                    <span className="text-slate-300">{"->"}</span>
+                    <code className="text-slate-700">
+                      {activeDisplayLabels[index] ?? variable}
+                    </code>
+                  </span>
+                ))}
+              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-400">
+                Inputs are detected from the formula after Generate or preset selection.
+              </p>
+            </div>
+            <div className="my-3 h-px bg-slate-100" />
+            <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Examples
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {FORMULA_EXAMPLES.map((example) => (
+                <button
+                  key={example}
+                  type="button"
+                  onClick={() => {
+                    applyFormulaText(example, { labels: DEFAULT_INPUT_LABELS });
+                    setPresetsOpen(false);
+                  }}
+                  className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 font-mono text-xs text-slate-600 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
+            <div className="my-3 h-px bg-slate-100" />
+            <div className="grid gap-3">
+              {PRESET_CATEGORIES.map((category) => {
+                const presets = PRESETS.filter(
+                  (preset) => preset.category === category
+                );
+
+                return (
+                  <div key={category}>
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      {category}
+                    </span>
+                    <div className="grid gap-2">
+                      {presets.map((preset) => (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => applyPreset(preset)}
+                          className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left transition hover:border-slate-300 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
+                        >
+                          <span className="block text-sm font-semibold text-slate-800">
+                            {preset.name}
+                          </span>
+                          <code className="mt-1 block break-words text-xs leading-5 text-slate-500">
+                            {preset.formula}
+                          </code>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        <form
+          className="mt-3 grid gap-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            applyFormula();
+          }}
+        >
+          <div className="grid gap-2">
+            <label htmlFor="formula-input" className="sr-only">
+              Boolean formula
+            </label>
+            <input
+              id="formula-input"
+              value={formulaInput}
+              onChange={(event) => setFormulaInput(event.target.value)}
+              className={`w-full rounded-md border bg-white px-3 py-2.5 font-mono text-sm text-slate-800 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-sky-500/20 ${
+                formulaError ? "border-rose-300" : "border-slate-200"
+              }`}
+              placeholder="F = A'B + AC or F(A,B,C)=m(1,3,7)"
+              aria-label="Boolean formula"
+              aria-invalid={Boolean(formulaError)}
+            />
+            <button type="submit" className="control-button-dark">
+              Generate
+            </button>
+          </div>
+          <p className="text-xs font-medium text-slate-500">
+            Detected variables:{" "}
+            <code className="text-slate-700">{activeDisplayLabels.join(", ")}</code>
+            <span className="ml-1 text-slate-400">
+              from the formula, up to {MAX_VARIABLE_COUNT} inputs
+            </span>
+          </p>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+            <button
+              type="button"
+              onClick={() => setIncludeOutputInverter((include) => !include)}
+              className={`w-full rounded-md border px-3 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
+                includeOutputInverter
+                  ? "border-slate-900 bg-slate-900 text-white"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+              }`}
+              aria-pressed={includeOutputInverter}
+            >
+              CMOS output {includeOutputInverter ? "+ INV" : "core"}
+            </button>
+            <span className="mt-2 block text-xs leading-5 text-slate-400">
+              Toggle the CMOS output stage without switching pages.
+            </span>
+          </div>
+          {formulaError && (
+            <p
+              className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700"
+              role="alert"
+            >
+              {formulaError}
+            </p>
+          )}
+        </form>
+      </section>
+    ) : null;
+
+  const logicCanvasPanels = (
+    <section className="min-w-0 space-y-5">
+      {!hasLogicCanvasContent && (
+        <EmptyView
+          workspace="Logic"
+          onOpenDisplay={() => setDisplayOpen(true)}
+        />
+      )}
+
+      {logicPanels.diagram && (
+        <section className="surface-card p-4">
+          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+                Gate Diagram
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-slate-400">
+                Clean term-level view with local input labels and a single output stage.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Routing
+              </span>
+              <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-1">
+                {([
+                  ["curved", "Curve"],
+                  ["straight", "Straight"]
+                ] as [GateWireStyle, string][]).map(([style, label]) => (
+                  <button
+                    key={style}
+                    type="button"
+                    onClick={() => setGateWireStyle(style)}
+                    className={`rounded px-2.5 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
+                      gateWireStyle === style
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                    aria-pressed={gateWireStyle === style}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <GateDiagram
+            variableCount={variableCount}
+            terms={result.terms}
+            expression={result.expression}
+            wireStyle={gateWireStyle}
+            variableLabels={displayLabels}
+          />
+        </section>
+      )}
+
+      {logicPanels.kmap && (
+        <KMapPanel
+          result={result}
+          onToggle={handleToggle}
+          variableLabels={displayLabels}
+        />
+      )}
+
+      {logicPanels.universal && (
+        <UniversalGatesPanel
+          conversions={gateConversions}
+          variableLabels={displayLabels}
+        />
+      )}
+
+      {logicPanels.truth && (
+        <TruthTable
+          variables={variables}
+          labels={activeDisplayLabels}
+          rows={truthRows}
+          onFillOutputs={fillOutputs}
+          onToggle={handleToggle}
+        />
+      )}
+    </section>
+  );
+
+  const logicResultPanels = showLogicSideColumn ? (
+    <aside className="min-w-0 space-y-5 xl:col-start-2 min-[1700px]:col-start-auto min-[1700px]:sticky min-[1700px]:top-24 min-[1700px]:self-start">
+      {logicPanels.forms && (
+        <section className="surface-card p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+              SOP / POS Forms
+            </h2>
+            <button
+              type="button"
+              onClick={copySimplifiedExpression}
+              className="control-button py-1.5 text-xs"
+            >
+              {expressionCopyState === "copied"
+                ? "Copied"
+                : expressionCopyState === "failed"
+                  ? "Copy failed"
+                  : "Copy SOP"}
+            </button>
+          </div>
+          <div className="mt-4 grid gap-3">
+            <ExpressionBlock label="Minimized SOP" value={simplifiedExpressionText} />
+            <ExpressionBlock label="Minimized POS" value={`F = ${displayPosExpression}`} />
+          </div>
+          <div className="mt-4 grid gap-2 text-sm text-slate-600">
+            <Metric label="Minterms" value={formatSet(result.minterms)} />
+            <Metric label="Maxterms" value={formatMaxterms(posResult.maxterms)} />
+            <Metric label="Don't cares" value={formatSet(result.dontCares)} />
+            <Metric
+              label="SOP terms"
+              value={
+                result.terms
+                  .map((term) => formatProductTerm(term.literals, displayLabels))
+                  .join(", ") || "none"
+              }
+            />
+            <Metric
+              label="POS clauses"
+              value={
+                posResult.terms
+                  .map((term) => formatSumTerm(term.literals, displayLabels))
+                  .join(" ") || "none"
+              }
+            />
+            <Metric
+              label="Essential prime implicants"
+              value={formatEssentialPrimeImplicants(
+                result.essentialPrimeImplicants,
+                displayLabels
+              )}
+            />
+          </div>
+          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Educational Estimates
+              </h3>
+              <span className="rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-slate-500">
+                approximate
+              </span>
+            </div>
+            <div className="mt-3 grid gap-2 text-sm text-slate-600">
+              <Metric
+                label="Original literals"
+                value={`${logicMetrics.originalLiteralCount}`}
+              />
+              <Metric
+                label="Simplified literals"
+                value={`${logicMetrics.simplifiedLiteralCount}`}
+              />
+              <Metric
+                label="Gate count"
+                value={`${logicMetrics.estimatedGateCount}`}
+              />
+              <Metric
+                label="Logic depth"
+                value={`${logicMetrics.estimatedLogicDepth}`}
+              />
+              <Metric
+                label="CMOS transistors"
+                value={`${logicMetrics.estimatedTransistorCount}`}
+              />
+            </div>
+            <p className="mt-3 text-xs leading-5 text-slate-500">
+              Estimates assume a simple SOP implementation plus static CMOS
+              transistor counts from the schematic model.
+            </p>
+          </div>
+        </section>
+      )}
+
+      {logicPanels.verilog && (
+        <section className="surface-card p-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+              Verilog
+            </h2>
+            <button
+              type="button"
+              onClick={copyVerilog}
+              className="control-button py-1.5 text-xs"
+            >
+              {copyState === "copied"
+                ? "Copied"
+                : copyState === "failed"
+                  ? "Copy failed"
+                  : "Copy"}
+            </button>
+          </div>
+          <pre className="mt-4 max-h-[480px] overflow-auto whitespace-pre-wrap break-words rounded-lg bg-slate-950 p-4 text-sm leading-6 text-emerald-100">
+            <code>{verilogBundle}</code>
+          </pre>
+        </section>
+      )}
+    </aside>
+  ) : null;
+
   return (
     <main className="app-shell min-h-screen overflow-x-hidden text-slate-900">
       <header className="border-b border-white/70 bg-white/85 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+        <div className="mx-auto flex max-w-[1720px] flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-slate-950 text-sm font-bold text-white shadow-soft">
               LC
@@ -570,7 +956,7 @@ export default function App() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1720px] px-4 py-5 sm:px-6 lg:px-8">
         <WorkspaceTabs
           activeWorkspace={activeWorkspace}
           cmosPanels={cmosPanels}
@@ -586,189 +972,6 @@ export default function App() {
           onToggleLogicPanel={toggleLogicPanel}
         />
 
-        {activeWorkspace !== "review" && (
-        <section className="surface-card relative mb-5 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-              Formula
-            </h2>
-            <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setGuideOpen(true);
-                  setPresetsOpen(false);
-                }}
-                className="control-button min-h-11 py-2 text-xs"
-                aria-label="Open formula guide"
-              >
-                Guide
-              </button>
-              <button
-                type="button"
-                onClick={copyShareUrl}
-                className="control-button min-h-11 py-2 text-xs"
-                aria-label="Copy shareable URL"
-              >
-                {shareCopyState === "copied"
-                  ? "URL copied"
-                  : shareCopyState === "failed"
-                    ? "Copy failed"
-                    : "Share"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setPresetsOpen((open) => !open)}
-                className="control-button min-h-11 py-2 text-xs"
-                aria-expanded={presetsOpen}
-                aria-label="Open formula presets"
-              >
-                Presets
-              </button>
-            </div>
-          </div>
-          {presetsOpen && (
-            <div className="z-20 mt-3 max-h-[calc(100vh-120px)] w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 shadow-soft sm:absolute sm:right-4 sm:top-12 sm:mt-0 sm:w-[min(520px,calc(100vw-48px))]">
-              <div>
-                <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  Detected inputs
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {variables.map((variable, index) => (
-                    <span
-                      key={variable}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600"
-                    >
-                      <span className="font-mono text-slate-400">{variable}</span>
-                      <span className="text-slate-300">→</span>
-                      <code className="text-slate-700">
-                        {activeDisplayLabels[index] ?? variable}
-                      </code>
-                    </span>
-                  ))}
-                </div>
-                <p className="mt-2 text-xs leading-5 text-slate-400">
-                  Inputs are detected from the formula after Generate or preset selection.
-                </p>
-              </div>
-              <div className="my-3 h-px bg-slate-100" />
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Examples
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {FORMULA_EXAMPLES.map((example) => (
-                  <button
-                    key={example}
-                    type="button"
-                    onClick={() => {
-                      applyFormulaText(example, { labels: DEFAULT_INPUT_LABELS });
-                      setPresetsOpen(false);
-                    }}
-                    className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 font-mono text-xs text-slate-600 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
-                  >
-                    {example}
-                  </button>
-                ))}
-              </div>
-              <div className="my-3 h-px bg-slate-100" />
-              <div className="grid gap-3">
-                {PRESET_CATEGORIES.map((category) => {
-                  const presets = PRESETS.filter(
-                    (preset) => preset.category === category
-                  );
-
-                  return (
-                    <div key={category}>
-                      <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        {category}
-                      </span>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {presets.map((preset) => (
-                          <button
-                            key={preset.id}
-                            type="button"
-                            onClick={() => applyPreset(preset)}
-                            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left transition hover:border-slate-300 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
-                          >
-                            <span className="block text-sm font-semibold text-slate-800">
-                              {preset.name}
-                            </span>
-                            <code className="mt-1 block break-words text-xs leading-5 text-slate-500">
-                              {preset.formula}
-                            </code>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          <form
-            className="mt-3 grid gap-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              applyFormula();
-            }}
-          >
-            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_132px]">
-              <label htmlFor="formula-input" className="sr-only">
-                Boolean formula
-              </label>
-              <input
-                id="formula-input"
-                value={formulaInput}
-                onChange={(event) => setFormulaInput(event.target.value)}
-                className={`w-full rounded-md border bg-white px-3 py-2.5 font-mono text-sm text-slate-800 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-sky-500/20 ${
-                  formulaError ? "border-rose-300" : "border-slate-200"
-                }`}
-                placeholder="F = A'B + AC or F(A,B,C)=Σm(1,3,7)"
-                aria-label="Boolean formula"
-                aria-invalid={Boolean(formulaError)}
-              />
-              <button
-                type="submit"
-                className="control-button-dark"
-              >
-                Generate
-              </button>
-            </div>
-            <p className="text-xs font-medium text-slate-500">
-              Detected variables:{" "}
-              <code className="text-slate-700">{activeDisplayLabels.join(", ")}</code>
-              <span className="ml-1 text-slate-400">
-                from the formula, up to {MAX_VARIABLE_COUNT} inputs
-              </span>
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIncludeOutputInverter((include) => !include)}
-                className={`rounded-md border px-3 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
-                  includeOutputInverter
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-white"
-                }`}
-                aria-pressed={includeOutputInverter}
-              >
-                CMOS output {includeOutputInverter ? "+ INV" : "core"}
-              </button>
-              <span className="text-xs leading-5 text-slate-400">
-                Switches the CMOS output stage without leaving Logic.
-              </span>
-            </div>
-            {formulaError && (
-              <p
-                className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700"
-                role="alert"
-              >
-                {formulaError}
-              </p>
-            )}
-          </form>
-        </section>
-        )}
 
         {guideOpen && (
           <FormulaGuideDialog
@@ -778,235 +981,39 @@ export default function App() {
         )}
 
         {activeWorkspace === "logic" ? (
-          <>
-            {!hasLogicContent && (
-              <EmptyView
-                workspace="Logic"
-                onOpenDisplay={() => setDisplayOpen(true)}
-              />
-            )}
-
-            {logicPanels.diagram && (
-              <section className="surface-card p-4">
-                <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                  <div>
-                    <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-                      Gate Diagram
-                    </h2>
-                    <p className="mt-1 text-xs leading-5 text-slate-400">
-                      Clean term-level view with local input labels and a single output stage.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Routing
-                    </span>
-                    <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-1">
-                      {([
-                        ["curved", "Curve"],
-                        ["straight", "Straight"]
-                      ] as [GateWireStyle, string][]).map(([style, label]) => (
-                        <button
-                          key={style}
-                          type="button"
-                          onClick={() => setGateWireStyle(style)}
-                          className={`rounded px-2.5 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
-                            gateWireStyle === style
-                              ? "bg-white text-slate-900 shadow-sm"
-                              : "text-slate-500 hover:text-slate-800"
-                          }`}
-                          aria-pressed={gateWireStyle === style}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <GateDiagram
-                  variableCount={variableCount}
-                  terms={result.terms}
-                  expression={result.expression}
-                  wireStyle={gateWireStyle}
-                  variableLabels={displayLabels}
-                />
-              </section>
-            )}
-
-            {showLogicMiddleRow && (
-              <div
-                className={`mt-5 grid min-w-0 gap-5 ${
-                  logicPanels.kmap && showLogicSideColumn
-                    ? "xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]"
-                    : ""
-                }`}
-              >
-                {logicPanels.kmap && (
-                  <section className="min-w-0">
-                    <KMapPanel
-                      result={result}
-                      onToggle={handleToggle}
-                      variableLabels={displayLabels}
-                    />
-                  </section>
-                )}
-
-                {showLogicSideColumn && (
-                  <div className="grid min-w-0 gap-5">
-                    {logicPanels.forms && (
-                      <section className="surface-card p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-                            SOP / POS Forms
-                          </h2>
-                          <button
-                            type="button"
-                            onClick={copySimplifiedExpression}
-                            className="control-button py-1.5 text-xs"
-                          >
-                            {expressionCopyState === "copied"
-                              ? "Copied"
-                              : expressionCopyState === "failed"
-                                ? "Copy failed"
-                                : "Copy SOP"}
-                          </button>
-                        </div>
-                        <div className="mt-4 grid gap-3">
-                          <ExpressionBlock label="Minimized SOP" value={simplifiedExpressionText} />
-                          <ExpressionBlock label="Minimized POS" value={`F = ${displayPosExpression}`} />
-                        </div>
-                        <div className="mt-4 grid gap-2 text-sm text-slate-600">
-                          <Metric label="Minterms" value={formatSet(result.minterms)} />
-                          <Metric label="Maxterms" value={formatMaxterms(posResult.maxterms)} />
-                          <Metric label="Don't cares" value={formatSet(result.dontCares)} />
-                          <Metric
-                            label="SOP terms"
-                            value={
-                              result.terms
-                                .map((term) => formatProductTerm(term.literals, displayLabels))
-                                .join(", ") || "none"
-                            }
-                          />
-                          <Metric
-                            label="POS clauses"
-                            value={
-                              posResult.terms
-                                .map((term) => formatSumTerm(term.literals, displayLabels))
-                                .join(" ") || "none"
-                            }
-                          />
-                          <Metric
-                            label="Essential prime implicants"
-                            value={formatEssentialPrimeImplicants(
-                              result.essentialPrimeImplicants,
-                              displayLabels
-                            )}
-                          />
-                        </div>
-                        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                              Educational Estimates
-                            </h3>
-                            <span className="rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-slate-500">
-                              approximate
-                            </span>
-                          </div>
-                          <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
-                            <Metric
-                              label="Original literals"
-                              value={`${logicMetrics.originalLiteralCount}`}
-                            />
-                            <Metric
-                              label="Simplified literals"
-                              value={`${logicMetrics.simplifiedLiteralCount}`}
-                            />
-                            <Metric
-                              label="Gate count"
-                              value={`${logicMetrics.estimatedGateCount}`}
-                            />
-                            <Metric
-                              label="Logic depth"
-                              value={`${logicMetrics.estimatedLogicDepth}`}
-                            />
-                            <Metric
-                              label="CMOS transistors"
-                              value={`${logicMetrics.estimatedTransistorCount}`}
-                            />
-                          </div>
-                          <p className="mt-3 text-xs leading-5 text-slate-500">
-                            Estimates assume a simple SOP implementation plus
-                            static CMOS transistor counts from the schematic
-                            model.
-                          </p>
-                        </div>
-                      </section>
-                    )}
-
-                    {logicPanels.verilog && (
-                      <section className="surface-card p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-                            Verilog
-                          </h2>
-                          <button
-                            type="button"
-                            onClick={copyVerilog}
-                            className="control-button py-1.5 text-xs"
-                          >
-                            {copyState === "copied"
-                              ? "Copied"
-                              : copyState === "failed"
-                                ? "Copy failed"
-                                : "Copy"}
-                          </button>
-                        </div>
-                        <pre className="mt-4 whitespace-pre-wrap break-words rounded-lg bg-slate-950 p-4 text-sm leading-6 text-emerald-100">
-                          <code>{verilogBundle}</code>
-                        </pre>
-                      </section>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {logicPanels.universal && (
-              <div className="mt-5">
-                <UniversalGatesPanel
-                  conversions={gateConversions}
-                  variableLabels={displayLabels}
-                />
-              </div>
-            )}
-
-            {logicPanels.truth && (
-              <div className="mt-5">
-                <TruthTable
-                  variables={variables}
-                  labels={activeDisplayLabels}
-                  rows={truthRows}
-                  onFillOutputs={fillOutputs}
-                  onToggle={handleToggle}
-                />
-              </div>
-            )}
-          </>
+          <div
+            className={`grid gap-5 ${
+              showLogicSideColumn
+                ? "xl:grid-cols-[300px_minmax(0,1fr)] min-[1700px]:grid-cols-[320px_minmax(0,1fr)_380px]"
+                : "xl:grid-cols-[300px_minmax(0,1fr)]"
+            }`}
+          >
+            <aside className="min-w-0 space-y-5 xl:sticky xl:top-24 xl:self-start">
+              {formulaPanel}
+            </aside>
+            {logicCanvasPanels}
+            {logicResultPanels}
+          </div>
         ) : activeWorkspace === "cmos" ? (
-          <div className="space-y-5">
-            {!hasCmosContent ? (
-              <EmptyView
-                workspace="CMOS"
-                onOpenDisplay={() => setDisplayOpen(true)}
-              />
-            ) : (
-              <CMOSPanel
-                includeOutputInverter={includeOutputInverter}
-                onIncludeOutputInverterChange={setIncludeOutputInverter}
-                plan={cmosPlan}
-                visibleSections={cmosPanels}
-              />
-            )}
+          <div className="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
+            <aside className="min-w-0 space-y-5 xl:sticky xl:top-24 xl:self-start">
+              {formulaPanel}
+            </aside>
+            <section className="min-w-0 space-y-5">
+              {!hasCmosContent ? (
+                <EmptyView
+                  workspace="CMOS"
+                  onOpenDisplay={() => setDisplayOpen(true)}
+                />
+              ) : (
+                <CMOSPanel
+                  includeOutputInverter={includeOutputInverter}
+                  onIncludeOutputInverterChange={setIncludeOutputInverter}
+                  plan={cmosPlan}
+                  visibleSections={cmosPanels}
+                />
+              )}
+            </section>
           </div>
         ) : (
           <LogicGateReview />

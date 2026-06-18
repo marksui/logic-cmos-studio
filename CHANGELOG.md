@@ -2,6 +2,12 @@
 
 All notable changes to Logic & CMOS Studio are summarized here.
 
+## v1.3.26 - 2026-06-18
+
+- Reorganized the main workspace into a desktop-first studio layout with a left formula rail, center visualization canvas, and responsive result rail.
+- Moved formula actions, presets, sharing, and CMOS output toggling into the side rail so the gate diagram and K-map get more uninterrupted space.
+- Tuned wide-screen breakpoints so standard desktop widths prioritize the diagram canvas while ultra-wide screens can show results beside it.
+
 ## v1.3.25 - 2026-06-17
 
 - Reworked the Gate Diagram into a cleaner desktop-friendly term-level layout with local literal labels instead of long input buses and repeated branch dots.
