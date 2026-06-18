@@ -1,7 +1,7 @@
 {
   "name": "logic-cmos-studio",
   "private": true,
-  "version": "1.3.23",
+  "version": "1.3.24",
   "homepage": "https://marksui.github.io/logic-cmos-studio/",
   "type": "module",
   "scripts": {

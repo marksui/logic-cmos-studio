@@ -2,6 +2,11 @@
 
 All notable changes to Logic & CMOS Studio are summarized here.
 
+## v1.3.24 - 2026-06-17
+
+- Added a direct Open Display action to empty Logic and CMOS states so users can recover from hiding every panel without hunting for the toolbar.
+- Kept the empty-state guidance aligned with the existing Display menu instead of adding another configuration path.
+
 ## v1.3.23 - 2026-06-17
 
 - Moved bulk truth-table output actions out of the Formula Presets menu and into the Truth Table panel where they belong.

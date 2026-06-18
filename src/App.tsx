@@ -779,7 +779,12 @@ export default function App() {
 
         {activeWorkspace === "logic" ? (
           <>
-            {!hasLogicContent && <EmptyView workspace="Logic" />}
+            {!hasLogicContent && (
+              <EmptyView
+                workspace="Logic"
+                onOpenDisplay={() => setDisplayOpen(true)}
+              />
+            )}
 
             {logicPanels.diagram && (
               <section className="surface-card p-4">
@@ -979,7 +984,10 @@ export default function App() {
         ) : activeWorkspace === "cmos" ? (
           <div className="space-y-5">
             {!hasCmosContent ? (
-              <EmptyView workspace="CMOS" />
+              <EmptyView
+                workspace="CMOS"
+                onOpenDisplay={() => setDisplayOpen(true)}
+              />
             ) : (
               <CMOSPanel
                 includeOutputInverter={includeOutputInverter}
@@ -996,7 +1004,13 @@ export default function App() {
     </main>
   );
 }
-function EmptyView({ workspace }: { workspace: Workspace | "Logic" | "CMOS" }) {
+function EmptyView({
+  onOpenDisplay,
+  workspace
+}: {
+  onOpenDisplay?: () => void;
+  workspace: "Logic" | "CMOS";
+}) {
   return (
     <section className="surface-card p-6 text-center">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
@@ -1005,6 +1019,15 @@ function EmptyView({ workspace }: { workspace: Workspace | "Logic" | "CMOS" }) {
       <p className="mt-2 text-sm text-slate-500">
         Open Display to choose what appears here.
       </p>
+      {onOpenDisplay && (
+        <button
+          type="button"
+          onClick={onOpenDisplay}
+          className="control-button mt-4 min-h-11 px-4 text-sm"
+        >
+          Open Display
+        </button>
+      )}
     </section>
   );
 }
