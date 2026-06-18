@@ -2,6 +2,11 @@
 
 All notable changes to Logic & CMOS Studio are summarized here.
 
+## v1.3.20 - 2026-06-17
+
+- Clarified the Display control by showing the active view name and visible-panel count directly in the workspace header.
+- Highlighted the active Quick View preset and added clearer accessibility labels for the display panel menu.
+
 ## v1.3.19 - 2026-06-17
 
 - Simplified the Formula Presets menu by removing manual variable-count controls; inputs now stay driven by the parsed formula or selected preset.

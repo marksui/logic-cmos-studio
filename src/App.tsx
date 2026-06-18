@@ -1331,12 +1331,26 @@ function WorkspaceTabs({
   const selectedCount = hasDisplayControls
     ? Object.values(activePanels).filter(Boolean).length
     : 0;
+  const activeViewLabel =
+    activeWorkspace === "logic"
+      ? LOGIC_VIEW_PRESETS.find((preset) =>
+          panelSetsMatch(logicPanels, preset.panels)
+        )?.label
+      : activeWorkspace === "cmos"
+        ? CMOS_VIEW_PRESETS.find((preset) =>
+            panelSetsMatch(cmosPanels, preset.panels)
+          )?.label
+        : undefined;
+  const displayPrimary = activeViewLabel ?? "Custom";
+  const displaySecondary = `${selectedCount} panel${
+    selectedCount === 1 ? "" : "s"
+  } visible`;
 
   return (
     <div className="sticky top-3 z-10 mb-5 rounded-lg border border-slate-200 bg-white/90 p-1 shadow-soft backdrop-blur">
       <div
         className={`grid gap-2 ${
-          hasDisplayControls ? "sm:grid-cols-[minmax(0,1fr)_132px]" : ""
+          hasDisplayControls ? "sm:grid-cols-[minmax(0,1fr)_168px]" : ""
         }`}
       >
         <div className="grid gap-2 sm:grid-cols-3">
@@ -1371,101 +1385,158 @@ function WorkspaceTabs({
         </div>
 
         {hasDisplayControls && (
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => onDisplayOpenChange(!displayOpen)}
-            className="h-full w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
-            aria-expanded={displayOpen}
-          >
-            Display {selectedCount}
-          </button>
-          {displayOpen && (
-            <div className="absolute right-0 top-12 z-30 w-[min(320px,calc(100vw-32px))] rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Quick Views
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => onDisplayOpenChange(!displayOpen)}
+              className="h-full w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 text-left transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
+              aria-expanded={displayOpen}
+              aria-label={`Display options, ${displayPrimary} view, ${displaySecondary}`}
+            >
+              <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                Display
               </span>
-              <div className="mb-3 grid gap-2">
-                {activePresets.map((preset) => (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    onClick={() => {
-                      if (activeWorkspace === "logic") {
-                        onApplyLogicPreset(
-                          preset.panels as PanelVisibility<LogicPanelId>
-                        );
-                      } else if (activeWorkspace === "cmos") {
-                        onApplyCmosPreset(
-                          preset.panels as PanelVisibility<CmosPanelId>
-                        );
-                      }
-                    }}
-                    className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left transition hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
-                  >
-                    <span className="block text-sm font-semibold text-slate-800">
-                      {preset.label}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-slate-500">
-                      {preset.description}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  Visible Panels
+              <span className="block truncate text-sm font-semibold text-slate-800">
+                {displayPrimary}
+              </span>
+              <span className="block text-[11px] font-medium text-slate-500">
+                {displaySecondary}
+              </span>
+            </button>
+            {displayOpen && (
+              <div
+                className="absolute right-0 top-14 z-30 w-[min(340px,calc(100vw-32px))] rounded-lg border border-slate-200 bg-white p-3 shadow-soft"
+                role="dialog"
+                aria-label="Display panel controls"
+              >
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Quick Views
                 </span>
-                <button
-                  type="button"
-                  onClick={onResetDisplay}
-                  className="rounded px-2 py-1 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
-                >
-                  Reset
-                </button>
-              </div>
-              <div className="grid gap-2">
-                {activeOptions.map((option) => {
-                  const checked =
-                    activeWorkspace === "logic"
-                      ? logicPanels[option.id as LogicPanelId]
-                      : cmosPanels[option.id as CmosPanelId];
+                <div className="mb-3 grid gap-2">
+                  {activePresets.map((preset) => {
+                    const presetActive =
+                      activeWorkspace === "logic"
+                        ? panelSetsMatch(
+                            logicPanels,
+                            preset.panels as PanelVisibility<LogicPanelId>
+                          )
+                        : activeWorkspace === "cmos"
+                          ? panelSetsMatch(
+                              cmosPanels,
+                              preset.panels as PanelVisibility<CmosPanelId>
+                            )
+                          : false;
 
-                  return (
-                    <label
-                      key={option.id}
-                      className="flex cursor-pointer items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
-                    >
-                      <span>{option.label}</span>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => {
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => {
                           if (activeWorkspace === "logic") {
-                            onToggleLogicPanel(option.id as LogicPanelId);
-                          } else {
-                            onToggleCmosPanel(option.id as CmosPanelId);
+                            onApplyLogicPreset(
+                              preset.panels as PanelVisibility<LogicPanelId>
+                            );
+                          } else if (activeWorkspace === "cmos") {
+                            onApplyCmosPreset(
+                              preset.panels as PanelVisibility<CmosPanelId>
+                            );
                           }
                         }}
-                        className="h-4 w-4 accent-slate-950"
-                      />
-                    </label>
-                  );
-                })}
+                        className={`rounded-md border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
+                          presetActive
+                            ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                            : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-white hover:shadow-sm"
+                        }`}
+                        aria-pressed={presetActive}
+                      >
+                        <span className="flex items-center justify-between gap-2">
+                          <span
+                            className={`block text-sm font-semibold ${
+                              presetActive ? "text-white" : "text-slate-800"
+                            }`}
+                          >
+                            {preset.label}
+                          </span>
+                          {presetActive && (
+                            <span className="rounded bg-white/15 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+                              Active
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className={`mt-0.5 block text-xs ${
+                            presetActive ? "text-slate-200" : "text-slate-500"
+                          }`}
+                        >
+                          {preset.description}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Visible Panels
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onResetDisplay}
+                    className="rounded px-2 py-1 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30"
+                  >
+                    Reset
+                  </button>
+                </div>
+                <div className="grid gap-2">
+                  {activeOptions.map((option) => {
+                    const checked =
+                      activeWorkspace === "logic"
+                        ? logicPanels[option.id as LogicPanelId]
+                        : cmosPanels[option.id as CmosPanelId];
+
+                    return (
+                      <label
+                        key={option.id}
+                        className="flex cursor-pointer items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
+                      >
+                        <span>{option.label}</span>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            if (activeWorkspace === "logic") {
+                              onToggleLogicPanel(option.id as LogicPanelId);
+                            } else {
+                              onToggleCmosPanel(option.id as CmosPanelId);
+                            }
+                          }}
+                          className="h-4 w-4 accent-slate-950"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  onClick={onResetWorkspace}
+                  className="mt-3 w-full rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/30"
+                >
+                  Reset workspace
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={onResetWorkspace}
-                className="mt-3 w-full rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/30"
-              >
-                Reset workspace
-              </button>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
         )}
       </div>
     </div>
+  );
+}
+
+function panelSetsMatch<T extends string>(
+  panels: PanelVisibility<T>,
+  preset: PanelVisibility<T>
+): boolean {
+  return (Object.keys(preset) as T[]).every(
+    (panel) => panels[panel] === preset[panel]
   );
 }
 
