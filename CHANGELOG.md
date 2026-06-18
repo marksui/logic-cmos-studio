@@ -2,6 +2,11 @@
 
 All notable changes to Logic & CMOS Studio are summarized here.
 
+## v1.3.25 - 2026-06-17
+
+- Reworked the Gate Diagram into a cleaner desktop-friendly term-level layout with local literal labels instead of long input buses and repeated branch dots.
+- Reduced redundant gate-diagram wiring by removing the extra merge spine and tightening the Routing control into the diagram header.
+
 ## v1.3.24 - 2026-06-17
 
 - Added a direct Open Display action to empty Logic and CMOS states so users can recover from hiding every panel without hunting for the toolbar.

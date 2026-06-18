@@ -788,28 +788,39 @@ export default function App() {
 
             {logicPanels.diagram && (
               <section className="surface-card p-4">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-                    Gate Diagram
-                  </h2>
-                  <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-1">
-                    {([
-                      ["curved", "Curve"],
-                      ["straight", "Straight"]
-                    ] as [GateWireStyle, string][]).map(([style, label]) => (
-                      <button
-                        key={style}
-                        type="button"
-                        onClick={() => setGateWireStyle(style)}
-                        className={`rounded px-2.5 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
-                          gateWireStyle === style
-                            ? "bg-white text-slate-900 shadow-sm"
-                            : "text-slate-500 hover:text-slate-800"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
+                <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+                      Gate Diagram
+                    </h2>
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      Clean term-level view with local input labels and a single output stage.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Routing
+                    </span>
+                    <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-1">
+                      {([
+                        ["curved", "Curve"],
+                        ["straight", "Straight"]
+                      ] as [GateWireStyle, string][]).map(([style, label]) => (
+                        <button
+                          key={style}
+                          type="button"
+                          onClick={() => setGateWireStyle(style)}
+                          className={`rounded px-2.5 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
+                            gateWireStyle === style
+                              ? "bg-white text-slate-900 shadow-sm"
+                              : "text-slate-500 hover:text-slate-800"
+                          }`}
+                          aria-pressed={gateWireStyle === style}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 <GateDiagram

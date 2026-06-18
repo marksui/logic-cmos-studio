@@ -54,34 +54,14 @@ export function GateDiagram({
 
   const legendRows = Math.max(1, Math.ceil(terms.length / LEGEND_COLUMNS));
   const headerHeight = 84 + legendRows * 24;
-  const inputSpacing = 48;
   const maxLiteralCount = Math.max(1, ...terms.map((term) => term.literals.length));
-  const termSpacing = Math.max(106, maxLiteralCount * 24 + 50);
-  const inputTop = headerHeight + 34;
-  const termTop = headerHeight + 28;
-  const inputRailStartX = 88;
-  const branchStartX = 154;
-  const termLaneSpacing = wireStyle === "straight" ? 28 : 36;
-  const literalLaneSpacing = wireStyle === "straight" ? 8 : 12;
-  const literalBranchX = new Map<string, number>();
-  let maxBranchX = branchStartX;
-
-  terms.forEach((term, termIndex) => {
-    term.literals.forEach((literal, literalIndex) => {
-      const branchX =
-        branchStartX + termIndex * termLaneSpacing + literalIndex * literalLaneSpacing;
-      literalBranchX.set(
-        literalRouteKey(term.id, literal.variable, literalIndex),
-        branchX
-      );
-      maxBranchX = Math.max(maxBranchX, branchX);
-    });
-  });
-
-  const inputBusEndX = Math.max(maxBranchX + 24, inputRailStartX + 170);
-  const gateX = inputBusEndX + 104;
+  const termSpacing = Math.max(108, maxLiteralCount * 24 + 56);
+  const termTop = headerHeight + 52;
+  const literalLabelX = 104;
+  const literalStubStartX = 126;
+  const gateX = 236;
   const gateOutputX = gateX + 98;
-  const mergeX = gateOutputX + 48;
+  const mergeX = gateOutputX + 70;
   const hasOrGate = terms.length > 1;
   const orX = hasOrGate ? mergeX + 92 : 0;
   const orOutputX = hasOrGate ? orX + 126 : 0;
@@ -90,30 +70,25 @@ export function GateDiagram({
   const termYs = terms.map((_, index) => termTop + index * termSpacing);
   const orY = termYs.reduce((sum, y) => sum + y, 0) / termYs.length;
   const orPinYs = makePinYs(orY, terms.length, 28);
-  const inputY = new Map<LogicVariable, number>(
-    variables.map((variable, index) => [variable, inputTop + index * inputSpacing])
-  );
   const height = Math.max(
     340,
-    inputTop + variables.length * inputSpacing + 74,
     termTop + terms.length * termSpacing + 64
   );
+  const inputSummary = `inputs: ${variables
+    .map((variable) => variableLabels?.[variable] ?? variable)
+    .join(", ")}`;
 
   return (
     <DiagramFrame height={height} title={title} width={diagramWidth}>
       <TermLegend terms={terms} variableLabels={variableLabels} />
-
-      <g>
-        {variables.map((variable) => (
-          <InputRail
-            key={variable}
-            label={variableLabels?.[variable] ?? variable}
-            y={inputY.get(variable) ?? inputTop}
-            x1={inputRailStartX}
-            x2={inputBusEndX}
-          />
-        ))}
-      </g>
+      <text
+        x={diagramWidth - 34}
+        y="36"
+        textAnchor="end"
+        className="fill-slate-400 text-xs font-semibold"
+      >
+        {inputSummary}
+      </text>
 
       <g>
         {terms.map((term, termIndex) => {
@@ -127,33 +102,30 @@ export function GateDiagram({
           return (
             <g key={term.id}>
               {term.literals.map((literal, literalIndex) => {
-                const sourceY = inputY.get(literal.variable) ?? inputTop;
                 const targetY = pinYs[literalIndex];
                 const notX = gateX - 52;
                 const inputEndX = literal.negated ? notX : gateX;
-                const branchX =
-                  literalBranchX.get(
-                    literalRouteKey(term.id, literal.variable, literalIndex)
-                  ) ?? inputBusEndX;
 
                 return (
                   <g key={`${term.id}-${literal.variable}-${literalIndex}`}>
-                    <path
-                      d={makeManhattanPath({
-                        endX: inputEndX,
-                        endY: targetY,
-                        routeX: branchX,
-                        startX: branchX - 14,
-                        startY: sourceY
-                      })}
-                      fill="none"
+                    <text
+                      x={literalLabelX}
+                      y={targetY + 4}
+                      textAnchor="end"
+                      className="fill-slate-700 text-xs font-bold"
+                    >
+                      {formatLiteralLabel(literal, variableLabels)}
+                    </text>
+                    <line
+                      x1={literalStubStartX}
+                      y1={targetY}
+                      x2={inputEndX}
+                      y2={targetY}
                       stroke={color}
                       strokeLinecap="round"
-                      strokeLinejoin="round"
                       strokeWidth="2.25"
                       opacity="0.9"
                     />
-                    <circle cx={branchX} cy={sourceY} r="3.45" fill={color} />
                     {literal.negated && (
                       <>
                         <NotGate x={notX} y={targetY} color={color} />
@@ -187,12 +159,13 @@ export function GateDiagram({
 
               {hasOrGate ? (
                 <path
-                  d={makeManhattanPath({
+                  d={makeOutputPath({
                     endX: orX + 8,
                     endY: orPinYs[termIndex],
                     routeX: mergeX,
                     startX: outputStartX,
-                    startY: termY
+                    startY: termY,
+                    wireStyle
                   })}
                   fill="none"
                   stroke={color}
@@ -211,12 +184,6 @@ export function GateDiagram({
                   strokeWidth="2.55"
                 />
               )}
-              <circle
-                cx={hasOrGate ? mergeX : outputStartX}
-                cy={termY}
-                r="3.6"
-                fill={color}
-              />
             </g>
           );
         })}
@@ -224,16 +191,6 @@ export function GateDiagram({
 
       {hasOrGate ? (
         <g>
-          <line
-            x1={mergeX}
-            y1={Math.min(...termYs)}
-            x2={mergeX}
-            y2={Math.max(...termYs)}
-            stroke="#94a3b8"
-            strokeLinecap="round"
-            strokeWidth="2"
-            opacity="0.65"
-          />
           <OrGate fanIn={terms.length} inputYs={orPinYs} x={orX} y={orY} />
           <line
             x1={orOutputX}
@@ -325,41 +282,6 @@ function TermLegend({
           </g>
         );
       })}
-    </g>
-  );
-}
-
-function InputRail({
-  label,
-  x1,
-  x2,
-  y
-}: {
-  label: string;
-  x1: number;
-  x2: number;
-  y: number;
-}) {
-  return (
-    <g>
-      <text
-        x="64"
-        y={y + 5}
-        textAnchor="end"
-        className="fill-slate-900 text-sm font-bold"
-      >
-        {label}
-      </text>
-      <line
-        x1={x1}
-        y1={y}
-        x2={x2}
-        y2={y}
-        stroke="#64748b"
-        strokeLinecap="round"
-        strokeWidth="2.2"
-      />
-      <circle cx={x1} cy={y} r="3.1" fill="#ffffff" stroke="#64748b" strokeWidth="1.8" />
     </g>
   );
 }
@@ -579,6 +501,38 @@ function makeManhattanPath({
   return `M${startX} ${startY} H${routeX} V${endY} H${endX}`;
 }
 
+function makeOutputPath({
+  endX,
+  endY,
+  routeX,
+  startX,
+  startY,
+  wireStyle
+}: {
+  endX: number;
+  endY: number;
+  routeX: number;
+  startX: number;
+  startY: number;
+  wireStyle: GateWireStyle;
+}) {
+  if (wireStyle === "straight" || startY === endY) {
+    return makeManhattanPath({ endX, endY, routeX, startX, startY });
+  }
+
+  const direction = endY > startY ? 1 : -1;
+  const radius = Math.min(14, Math.abs(endY - startY) / 2);
+
+  return [
+    `M${startX} ${startY}`,
+    `H${routeX - radius}`,
+    `Q${routeX} ${startY} ${routeX} ${startY + direction * radius}`,
+    `V${endY - direction * radius}`,
+    `Q${routeX} ${endY} ${routeX + radius} ${endY}`,
+    `H${endX}`
+  ].join(" ");
+}
+
 function formatDiagramTitle(
   expression: string,
   terms: ProductTerm[],
@@ -606,10 +560,10 @@ function formatTermLabel(
   return parts.join(usesCustomName ? "*" : "");
 }
 
-function literalRouteKey(
-  termId: string,
-  variable: LogicVariable,
-  literalIndex: number
+function formatLiteralLabel(
+  literal: ProductTerm["literals"][number],
+  labels: Record<LogicVariable, string> | undefined
 ): string {
-  return `${termId}-${variable}-${literalIndex}`;
+  const label = labels?.[literal.variable] ?? literal.variable;
+  return `${label}${literal.negated ? "'" : ""}`;
 }
