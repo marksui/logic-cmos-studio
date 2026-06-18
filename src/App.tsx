@@ -588,11 +588,11 @@ export default function App() {
 
         {activeWorkspace !== "review" && (
         <section className="surface-card relative mb-5 p-4">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
               Formula
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
               <button
                 type="button"
                 onClick={() => {
@@ -600,6 +600,7 @@ export default function App() {
                   setPresetsOpen(false);
                 }}
                 className="control-button py-1.5 text-xs"
+                aria-label="Open formula guide"
               >
                 Guide
               </button>
@@ -607,6 +608,7 @@ export default function App() {
                 type="button"
                 onClick={resetWorkspace}
                 className="control-button py-1.5 text-xs"
+                aria-label="Reset workspace"
               >
                 Reset
               </button>
@@ -614,6 +616,7 @@ export default function App() {
                 type="button"
                 onClick={copyShareUrl}
                 className="control-button py-1.5 text-xs"
+                aria-label="Copy shareable URL"
               >
                 {shareCopyState === "copied"
                   ? "URL copied"
@@ -626,13 +629,14 @@ export default function App() {
                 onClick={() => setPresetsOpen((open) => !open)}
                 className="control-button py-1.5 text-xs"
                 aria-expanded={presetsOpen}
+                aria-label="Open formula presets"
               >
                 Presets
               </button>
             </div>
           </div>
           {presetsOpen && (
-            <div className="absolute right-4 top-12 z-20 max-h-[calc(100vh-120px)] w-[min(520px,calc(100vw-48px))] overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 shadow-soft">
+            <div className="z-20 mt-3 max-h-[calc(100vh-120px)] w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 shadow-soft sm:absolute sm:right-4 sm:top-12 sm:mt-0 sm:w-[min(520px,calc(100vw-48px))]">
               <div>
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
                   Detected inputs
@@ -736,7 +740,11 @@ export default function App() {
             }}
           >
             <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_132px]">
+              <label htmlFor="formula-input" className="sr-only">
+                Boolean formula
+              </label>
               <input
+                id="formula-input"
                 value={formulaInput}
                 onChange={(event) => setFormulaInput(event.target.value)}
                 className={`w-full rounded-md border bg-white px-3 py-2.5 font-mono text-sm text-slate-800 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-sky-500/20 ${

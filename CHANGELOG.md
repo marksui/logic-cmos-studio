@@ -2,6 +2,11 @@
 
 All notable changes to Logic & CMOS Studio are summarized here.
 
+## v1.3.21 - 2026-06-17
+
+- Improved the Formula toolbar on narrow screens by letting actions wrap into a compact two-column layout.
+- Made the Presets menu flow inline on mobile while keeping the desktop popover, and added stronger labels for formula controls.
+
 ## v1.3.20 - 2026-06-17
 
 - Clarified the Display control by showing the active view name and visible-panel count directly in the workspace header.
