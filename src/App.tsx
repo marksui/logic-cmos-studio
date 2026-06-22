@@ -807,7 +807,7 @@ export default function App() {
   );
 
   const logicResultPanels = showLogicSideColumn ? (
-    <aside className="min-w-0 space-y-5 xl:col-start-2 min-[1700px]:col-start-auto min-[1700px]:sticky min-[1700px]:top-24 min-[1700px]:self-start">
+    <aside className="min-w-0 space-y-5 min-[1500px]:sticky min-[1500px]:top-5 min-[1500px]:self-start">
       {logicPanels.forms && (
         <section className="surface-card p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -923,82 +923,108 @@ export default function App() {
     </aside>
   ) : null;
 
+  const workspaceHeading =
+    activeWorkspace === "logic"
+      ? "Logic Workspace"
+      : activeWorkspace === "cmos"
+        ? "CMOS Workspace"
+        : "Gate Review";
+  const workspaceDescription =
+    activeWorkspace === "logic"
+      ? "Build, simplify, and inspect Boolean logic with the diagram and K-map centered on the screen."
+      : activeWorkspace === "cmos"
+        ? "Inspect pull-up / pull-down networks, transistor estimates, and teaching-level CMOS schematics."
+        : "Compare every supported logic gate, expression form, symbol, and truth table in a wide review grid.";
+
   return (
     <main className="app-shell min-h-screen overflow-x-hidden text-slate-900">
-      <header className="border-b border-white/70 bg-white/85 backdrop-blur">
-        <div className="mx-auto flex max-w-[1720px] flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-          <div className="flex min-w-0 items-center gap-3">
+      <div className="mx-auto flex min-h-screen w-full max-w-[1920px] flex-col lg:flex-row">
+        <aside className="z-20 border-b border-white/70 bg-white/90 px-4 py-4 shadow-soft backdrop-blur sm:px-6 lg:sticky lg:top-0 lg:h-screen lg:w-[360px] lg:shrink-0 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:border-slate-200/80 lg:px-5">
+          <div className="mb-4 flex min-w-0 items-center gap-3">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-slate-950 text-sm font-bold text-white shadow-soft">
               LC
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-bold tracking-normal text-slate-950">
+                <h1 className="text-xl font-bold tracking-normal text-slate-950">
                   Logic & CMOS Studio
                 </h1>
                 <span className="rounded-md border border-sky-200 bg-sky-50 px-2 py-1 font-mono text-xs font-bold text-sky-700">
                   {APP_VERSION}
                 </span>
               </div>
-              <p className="mt-1 text-sm text-slate-500">
-                Boolean logic, Karnaugh maps, universal gates, and CMOS sizing in one workspace.
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Boolean logic, K-maps, Verilog, and static CMOS in one desktop workspace.
               </p>
             </div>
           </div>
+
+          <WorkspaceTabs
+            activeWorkspace={activeWorkspace}
+            cmosPanels={cmosPanels}
+            displayOpen={displayOpen}
+            logicPanels={logicPanels}
+            onApplyCmosPreset={applyCmosViewPreset}
+            onApplyLogicPreset={applyLogicViewPreset}
+            onChange={setActiveWorkspace}
+            onDisplayOpenChange={setDisplayOpen}
+            onResetDisplay={resetDisplay}
+            onResetWorkspace={resetWorkspace}
+            onToggleCmosPanel={toggleCmosPanel}
+            onToggleLogicPanel={toggleLogicPanel}
+          />
+
+          {formulaPanel && <div className="mt-4">{formulaPanel}</div>}
+
           <a
-            className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-soft transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 focus-visible:ring-offset-2"
+            className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-soft transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 focus-visible:ring-offset-2"
             href="https://marksui.github.io/Hardware_Interview_Trainer/"
             rel="noreferrer"
             target="_blank"
           >
             Hardware Interview Trainer
           </a>
-        </div>
-      </header>
+        </aside>
 
-      <div className="mx-auto max-w-[1720px] px-4 py-5 sm:px-6 lg:px-8">
-        <WorkspaceTabs
-          activeWorkspace={activeWorkspace}
-          cmosPanels={cmosPanels}
-          displayOpen={displayOpen}
-          logicPanels={logicPanels}
-          onApplyCmosPreset={applyCmosViewPreset}
-          onApplyLogicPreset={applyLogicViewPreset}
-          onChange={setActiveWorkspace}
-          onDisplayOpenChange={setDisplayOpen}
-          onResetDisplay={resetDisplay}
-          onResetWorkspace={resetWorkspace}
-          onToggleCmosPanel={toggleCmosPanel}
-          onToggleLogicPanel={toggleLogicPanel}
-        />
+        <section className="min-w-0 flex-1 px-4 py-4 sm:px-6 lg:px-6 xl:px-8">
+          {guideOpen && (
+            <FormulaGuideDialog
+              onClose={() => setGuideOpen(false)}
+              onUseFormula={useGuideFormula}
+            />
+          )}
 
-
-        {guideOpen && (
-          <FormulaGuideDialog
-            onClose={() => setGuideOpen(false)}
-            onUseFormula={useGuideFormula}
-          />
-        )}
-
-        {activeWorkspace === "logic" ? (
-          <div
-            className={`grid gap-5 ${
-              showLogicSideColumn
-                ? "xl:grid-cols-[300px_minmax(0,1fr)] min-[1700px]:grid-cols-[320px_minmax(0,1fr)_380px]"
-                : "xl:grid-cols-[300px_minmax(0,1fr)]"
-            }`}
-          >
-            <aside className="min-w-0 space-y-5 xl:sticky xl:top-24 xl:self-start">
-              {formulaPanel}
-            </aside>
-            {logicCanvasPanels}
-            {logicResultPanels}
+          <div className="mb-5 flex flex-col gap-3 rounded-lg border border-white/70 bg-white/70 px-4 py-3 shadow-soft backdrop-blur sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                {activeWorkspace}
+              </span>
+              <h2 className="mt-1 text-2xl font-bold tracking-normal text-slate-950">
+                {workspaceHeading}
+              </h2>
+              <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-500">
+                {workspaceDescription}
+              </p>
+            </div>
+            {activeWorkspace !== "review" && (
+              <span className="w-fit rounded-md border border-slate-200 bg-white px-2.5 py-1 font-mono text-xs font-semibold text-slate-600">
+                F = {displaySopExpression}
+              </span>
+            )}
           </div>
-        ) : activeWorkspace === "cmos" ? (
-          <div className="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
-            <aside className="min-w-0 space-y-5 xl:sticky xl:top-24 xl:self-start">
-              {formulaPanel}
-            </aside>
+
+          {activeWorkspace === "logic" ? (
+            <div
+              className={`grid min-w-0 gap-5 ${
+                showLogicSideColumn
+                  ? "min-[1500px]:grid-cols-[minmax(0,1fr)_390px]"
+                  : ""
+              }`}
+            >
+              {logicCanvasPanels}
+              {logicResultPanels}
+            </div>
+          ) : activeWorkspace === "cmos" ? (
             <section className="min-w-0 space-y-5">
               {!hasCmosContent ? (
                 <EmptyView
@@ -1014,10 +1040,10 @@ export default function App() {
                 />
               )}
             </section>
-          </div>
-        ) : (
-          <LogicGateReview />
-        )}
+          ) : (
+            <LogicGateReview />
+          )}
+        </section>
       </div>
     </main>
   );
@@ -1368,15 +1394,19 @@ function WorkspaceTabs({
   const displaySecondary = `${selectedCount} panel${
     selectedCount === 1 ? "" : "s"
   } visible`;
+  const workspaceDescriptions: Record<Workspace, string> = {
+    cmos: "Transistors and networks",
+    logic: "Equation, K-map, diagram",
+    review: "Symbols and truth tables"
+  };
 
   return (
-    <div className="sticky top-3 z-10 mb-5 rounded-lg border border-slate-200 bg-white/90 p-1 shadow-soft backdrop-blur">
-      <div
-        className={`grid gap-2 ${
-          hasDisplayControls ? "sm:grid-cols-[minmax(0,1fr)_168px]" : ""
-        }`}
-      >
-        <div className="grid gap-2 sm:grid-cols-3">
+    <div className="surface-card p-3">
+      <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+        Pages
+      </span>
+      <div className="grid gap-2">
+        <div className="grid gap-2">
           {(["logic", "cmos", "review"] as Workspace[]).map((workspace) => {
             const active = workspace === activeWorkspace;
             const label =
@@ -1394,21 +1424,28 @@ function WorkspaceTabs({
                   onChange(workspace);
                   onDisplayOpenChange(false);
                 }}
-                className={`rounded-md px-4 py-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
+                className={`rounded-md px-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/30 ${
                   active
                     ? "bg-slate-900 text-white shadow-sm"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }`}
                 aria-pressed={active}
               >
-                {label}
+                <span className="block text-sm font-semibold">{label}</span>
+                <span
+                  className={`mt-0.5 block text-xs ${
+                    active ? "text-slate-200" : "text-slate-400"
+                  }`}
+                >
+                  {workspaceDescriptions[workspace]}
+                </span>
               </button>
             );
           })}
         </div>
 
         {hasDisplayControls && (
-          <div className="relative">
+          <div className="mt-1">
             <button
               type="button"
               onClick={() => onDisplayOpenChange(!displayOpen)}
@@ -1428,7 +1465,7 @@ function WorkspaceTabs({
             </button>
             {displayOpen && (
               <div
-                className="absolute right-0 top-14 z-30 w-[min(340px,calc(100vw-32px))] rounded-lg border border-slate-200 bg-white p-3 shadow-soft"
+                className="mt-3 rounded-lg border border-slate-200 bg-white p-3 shadow-soft"
                 role="dialog"
                 aria-label="Display panel controls"
               >

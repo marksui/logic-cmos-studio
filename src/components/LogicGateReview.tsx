@@ -216,7 +216,7 @@ export function LogicGateReview() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
         {GATES.map((gate) => (
           <article key={gate.id} className="surface-card overflow-hidden">
             <div className="grid gap-4 p-4 md:grid-cols-[220px_minmax(0,1fr)]">
